@@ -1,0 +1,4 @@
+   __m256d t0;
+   t0 = _mm256_permute2f128_pd( rowA1, rowA0, 0x2 );
+   rowA1 = _mm256_permute2f128_pd( rowA1, rowA0, 0x13 );
+   rowA0 = t0;

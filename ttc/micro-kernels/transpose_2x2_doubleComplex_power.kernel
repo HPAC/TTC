@@ -1,0 +1,6 @@
+   vector4double cc = (vector4double) {2, 2.25, 3, 3.25};
+   vector4double dd = (vector4double) {2.5, 2.75, 3.5, 3.75};
+   
+   vector4double _t = vec_perm(rowA0,rowA1, cc);
+   rowA1 = vec_perm(rowA0, rowA1, dd); 
+   rowA0 = _t;

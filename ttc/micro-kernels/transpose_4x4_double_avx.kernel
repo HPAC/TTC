@@ -1,0 +1,9 @@
+   __m256d r4, r34, r3, r33;
+   r33 = _mm256_shuffle_pd( rowA2, rowA3, 0x3 );
+    r3 = _mm256_shuffle_pd( rowA0, rowA1, 0x3 );
+   r34 = _mm256_shuffle_pd( rowA2, rowA3, 0xc );
+    r4 = _mm256_shuffle_pd( rowA0, rowA1, 0xc );
+   rowA0 = _mm256_permute2f128_pd( r34, r4, 0x2 );
+   rowA1 = _mm256_permute2f128_pd( r33, r3, 0x2 );
+   rowA2 = _mm256_permute2f128_pd( r33, r3, 0x13 );
+   rowA3 = _mm256_permute2f128_pd( r34, r4, 0x13 );

@@ -1,0 +1,14 @@
+   vector4double aa = (vector4double) {2, 3, 2.5, 3.5};
+   vector4double bb = (vector4double) {2.25, 3.25, 2.75, 3.75};
+   vector4double cc = (vector4double) {2, 2.25, 3, 3.25};
+   vector4double dd = (vector4double) {2.5, 2.75, 3.5, 3.75};
+   
+   vector4double r010 = vec_perm(rowA0,rowA1, aa); //0,4,2,6
+   vector4double r011 = vec_perm(rowA0,rowA1, bb); //1,5,3,7
+   vector4double r230 = vec_perm(rowA2,rowA3, aa); //8,12,10,14
+   vector4double r231 = vec_perm(rowA2,rowA3, bb); //9,13,11,15
+
+   rowA0 = vec_perm(r010, r230, cc); //0,4,8,12
+   rowA1 = vec_perm(r011, r231, cc); //1,5,9,13
+   rowA2 = vec_perm(r010, r230, dd); //2,6,10,14
+   rowA3 = vec_perm(r011, r231, dd); //3,7,11,15
