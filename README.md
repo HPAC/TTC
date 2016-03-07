@@ -6,7 +6,12 @@ TTC supports arbitrarily dimensional, out-of-place tensor transpositions of the 
 
 ![ttc](https://github.com/HPAC/TTC/blob/master/misc/equation.png)
 
-with A and B respectively being the input and output tensor. \Pi, ![](https://github.com/HPAC/TTC/blob/master/misc/alpha.png) and \beta denote the user-specified transposition and the scalars for A and B (e.g., \alpha = 1 and \beta = 0 corresponds to an ordinary out-of-place transposition), respectively.
+where A and B respectively denote the input and output tensor;
+![](https://github.com/HPAC/TTC/blob/master/misc/pi.png) represents the user-specified
+transposition, and 
+![](https://github.com/HPAC/TTC/blob/master/misc/alpha.png) and
+![](https://github.com/HPAC/TTC/blob/master/misc/beta.png) being scalars
+(e.g., ![](https://github.com/HPAC/TTC/blob/master/misc/beta.png) = 1 and ![](https://github.com/HPAC/TTC/blob/master/misc/beta.png) = 0 corresponds to an ordinary out-of-place transposition).
 
 # Key Features
 --------------
