@@ -4,7 +4,7 @@ The Tensor Transpose Compiler (TTC) generates high-performance parallel and vect
 
 TTC supports arbitaryly dimensional, out-of-place tensor transpositions of the general form:
 
-![ttc](https://github.com/HPAC/TTC/blob/master/misc/equation.pdf)
+![ttc](https://github.com/HPAC/TTC/blob/master/misc/equation.png)
 
 with $$A$$ and $$B$$ respectively being the input and output tensor. $$\Pi$$, $$\alpha$$ and $$\beta$$ respectively denote the user-specified transposition and the scalars for $$A$$ and $$B$$ (e.g., $$\alpha = 1$$ and $$\beta = 0$$ corresponds to an ordinary out-of-place transposition).
 # Key Features
@@ -88,6 +88,6 @@ article:
    journal     = {Arxiv},
    year        = {2016},
    issue_date  = {March 2016},
-   url         = {[http://arxiv.org/abs/1502.03234](http://arxiv.org/abs/1502.03234)}
+   url         = {http://arxiv.org/abs/1502.03234}
 }
 ``` 
