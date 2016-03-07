@@ -4,9 +4,10 @@ The Tensor Transpose Compiler (TTC) generates high-performance parallel and vect
 
 TTC supports arbitrarily dimensional, out-of-place tensor transpositions of the general form:
 
-![ttc](https://github.com/HPAC/TTC/blob/master/misc/equation.png =100px)
+![ttc](https://github.com/HPAC/TTC/blob/master/misc/equation.png)
 
-with A and B respectively being the input and output tensor. \Pi, \alpha and \beta respectively denote the user-specified transposition and the scalars for A and B (e.g., \alpha = 1 and \beta = 0 corresponds to an ordinary out-of-place transposition).
+with A and B respectively being the input and output tensor. \Pi, \alpha and \beta denote the user-specified transposition and the scalars for A and B (e.g., \alpha = 1 and \beta = 0 corresponds to an ordinary out-of-place transposition), respectively.
+
 # Key Features
 --------------
 
@@ -15,7 +16,7 @@ with A and B respectively being the input and output tensor. \Pi, \alpha and \be
 * Support for all datatypes (i.e., single, double, single-complex and double-comlex)
 * Support for **mixed precision** (i.e., different data types for A and B)
     * For instance, this feature can be used to generate a mixed-precision BLAS
-* Support for multiple strides in A and B
+* Support for multiple leading dimensions in both A and B
     * This enables the user to extract (and transpose) a smaller subtensor out of a larger tensor
 * TTC allows the user to guide the code generation process:
     * E.g., specifying the --maxImplementations=N argument will limited the number of generated implementations to N
