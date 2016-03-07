@@ -2,11 +2,11 @@
 
 The Tensor Transpose Compiler (TTC) generates high-performance parallel and vectorized C++ code for multidimensional tensor transpositions.
 
-TTC supports arbitaryly dimensional, out-of-place tensor transpositions of the general form:
+TTC supports arbitrarily dimensional, out-of-place tensor transpositions of the general form:
 
-![ttc](https://github.com/HPAC/TTC/blob/master/misc/equation.png)
+![ttc](https://github.com/HPAC/TTC/blob/master/misc/equation.png=120x)
 
-with $$A$$ and $$B$$ respectively being the input and output tensor. $$\Pi$$, $$\alpha$$ and $$\beta$$ respectively denote the user-specified transposition and the scalars for $$A$$ and $$B$$ (e.g., $$\alpha = 1$$ and $$\beta = 0$$ corresponds to an ordinary out-of-place transposition).
+with A and B respectively being the input and output tensor. \Pi, \alpha and \beta respectively denote the user-specified transposition and the scalars for A and B (e.g., \alpha = 1 and \beta = 0 corresponds to an ordinary out-of-place transposition).
 # Key Features
 --------------
 
@@ -28,7 +28,7 @@ Create a directory where you want to install TTC
 
     mkdir /path/to/ttc
 
-Make sure that you export the TTC_ROOT environment variable (add to your bashrc)
+Make sure that you export the TTC_ROOT environment variable (add to your .bashrc)
 
     export TTC_ROOT=/path/to/ttc
 
@@ -52,7 +52,7 @@ to make TTC available.
 # Getting Started
 -----------------
 
-Please run **ttc --help** to get an overview of TTC's paramters.
+Please run **ttc --help** to get an overview of TTC's parameters.
 
 Here is one exemplary input to TTC: 
 
@@ -88,6 +88,6 @@ article:
    journal     = {Arxiv},
    year        = {2016},
    issue_date  = {March 2016},
-   url         = {http://arxiv.org/abs/1502.03234}
+   url         = {http://arxiv.org/abs/TBA}
 }
 ``` 
