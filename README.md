@@ -4,9 +4,9 @@ The Tensor Transpose Compiler (TTC) generates high-performance parallel and vect
 
 TTC supports arbitaryly dimensional, out-of-place tensor transpositions of the general form:
 
-$$B_{\Pi(i_1,i_2,...,i_N)} \gets \alpha \times A_{i_1,i_2,...,i_N} + \beta \times B_{\Pi(i_1,i_2,...,i_N)}$$
+![ttc](https://github.com/HPAC/TTC/misc/equation.pdf)
 
-with $$A$$ and $$B$$ respectively being the input and output tenosor. $$\Pi$$, $$\alpha$$ and $$\beta$$ respectively denote the user-specified transposition and the scalars for $$A$$ and $$B$$ (e.g., $$\alpha = 1$$ and $$\beta = 0$$ corresponds to an ordinary out-of-place transposition).
+with $$A$$ and $$B$$ respectively being the input and output tensor. $$\Pi$$, $$\alpha$$ and $$\beta$$ respectively denote the user-specified transposition and the scalars for $$A$$ and $$B$$ (e.g., $$\alpha = 1$$ and $$\beta = 0$$ corresponds to an ordinary out-of-place transposition).
 # Key Features
 --------------
 
@@ -34,7 +34,7 @@ Make sure that you export the TTC_ROOT environment variable (add to your bashrc)
 
 Clone the repository into the newly created directory
 
-    git clone git@bitbucket.org:paul8912/tensor-transposition-compiler-ttc.git $TTC_ROOT
+    git clone https://github.com/HPAC/TTC.git $TTC_ROOT
 
 Install TTC
 
@@ -54,7 +54,7 @@ to make TTC available.
 
 Please run **ttc --help** to get an overview of TTC's paramters.
 
-Here is one examplary input to TTC: 
+Here is one exemplary input to TTC: 
 
     ttc --perm=1,0,2 --size=1000,768,16 --floatType=s --alpha=1.0 --beta=1.0 --numThreads=20
 
@@ -69,7 +69,7 @@ You have to have a working C compiler. I have tested TTC with:
 # Benchmark
 -----------
 
-TTC provides a benchmark for tensor transpositions [benchmark.py](benchmark.py).
+TTC provides a [benchmark for tensor transpositions](https://github.com/HPAC/TTC/benchmark/benchmark.py).
 
     python benchmark.py <num_threads>
 
