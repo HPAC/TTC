@@ -165,6 +165,7 @@ def printHelp():
     print "   --hotB".ljust(60),"Specifying this flag will keep the input tensor B in cache while measuring (this will not have any effect if B does not fit into the cache)."
     print "   --help".ljust(60),"prints this help"
     print "   --vecLength=<value>".ljust(60),"CUDA Vector length for GPU"
+    print "   --hostname=<host>".ljust(60),"Specify the host name of the Xeon Phi card that you want to run the transposition on (e.g., localhost-mic0). This argument is only required for runs on a Xeon Phi."
     print """   --architecture=
     avx, power, avx512, knc, cuda 
     
@@ -646,7 +647,7 @@ def generateTransposition( ttcArgs ):
         print FAIL + "[TTC] ERROR: mixed precision not yet supported for this architecture." + ENDC
         exit(-1)
     if( ttcArgs.architecture == "knc" and ttcArgs.hostName == "" ):
-        print FAIL + "[TTC] ERROR: you are using the KNC please specify the hostname of the KNC card (e.g., cluster-phi-mic0)" + ENDC
+        print FAIL + "[TTC] ERROR: you are using the KNC please specify the hostname of the KNC card (e.g., --hostname=cluster-phi-mic0)" + ENDC
         exit(-1)
 
     if ttcArgs.maxNumImplementations == -1:
@@ -728,6 +729,14 @@ def generateTransposition( ttcArgs ):
     ###########################################
     # sanity check
     ###########################################
+    ###########################################
+    if( ttcArgs.architecture != "avx" and ttc.floatTypeA != ttc.floatTypeB):
+        print FAIL + "[TTC] ERROR: Mixed precision is currently only supported for avx-enabled processors."
+        exit(-1)
+    if( (ttcArgs.architecture == "avx512" or ttcArgs.architecture == "power") and ttc.floatTypeA != "float"):
+        print FAIL + "[TTC] ERROR: the selected architecture doesn't support the selected precision yet."
+        exit(-1)
+
     if(ttcArgs.lda[0] != 1 or ttcArgs.ldb[0] != 1):
         print FAIL + "[TTC] ERROR: the stride for the leading dimension of A and B must be 1" + ENDC
         exit(-1)
@@ -1097,7 +1106,7 @@ def main():
             "--numThreads", "--generateOnly","--prefetchDistances",
             "--updateDatabase","--dontCompile","-v", "--blockings",
             "--noTest","--no-align","--no-vec","--mpi", "--architecture",
-            "--affinity","--lda", "--ldb", "--ignoreDatabase", "--hostName","--vecLength", "--hotA", "--hotB"]
+            "--affinity","--lda", "--ldb", "--ignoreDatabase", "--hostname","--vecLength", "--hotA", "--hotB"]
 
     _hotA = 0
     _hotB = 0
@@ -1176,7 +1185,7 @@ def main():
             _hotB = 1
         if arg == "--papi":
             _papi = 1
-        if arg.find("--hostName=") != -1:
+        if arg.find("--hostname=") != -1:
             _hostName = arg.split("=")[1] 
         if arg.find("--architecture=") != -1:
             if( arg.split("=")[1] == "avx" ):
