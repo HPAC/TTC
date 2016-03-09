@@ -45,7 +45,7 @@ Clone the repository into the newly created directory:
 Install TTC:
 
     cd $TTC_ROOT
-    python setup.py --user
+    python setup.py install --user
 
 Make sure that the installed script can be found in your path. You might have to
    
