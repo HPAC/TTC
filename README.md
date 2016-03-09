@@ -30,19 +30,19 @@ transposition, and
 # Install
 ---------
 
-Create a directory where you want to install TTC
+Create a directory where you want to install TTC:
 
     mkdir /path/to/ttc
 
-Make sure that you export the TTC_ROOT environment variable (add to your .bashrc)
+Make sure that you export the TTC_ROOT environment variable (add to your .bashrc):
 
     export TTC_ROOT=/path/to/ttc
 
-Clone the repository into the newly created directory
+Clone the repository into the newly created directory:
 
     git clone https://github.com/HPAC/TTC.git $TTC_ROOT
 
-Install TTC
+Install TTC:
 
     cd $TTC_ROOT
     python setup.py --user
@@ -83,7 +83,7 @@ This will generate the input strings for TTC for each of the test-cases within t
 The benchmark uses a default tensor size of 200 MiB (see _sizeMB variable)
 
 
-# Citations
+# Citation
 -----------
 In case you want refer to TTC as part of a research paper, please cite the following
 article [(pdf)](http://arxiv.org/pdf/1603.02297v1):
@@ -97,3 +97,10 @@ article [(pdf)](http://arxiv.org/pdf/1603.02297v1):
    url         = {http://arxiv.org/abs/1603.02297}
 }
 ``` 
+
+
+# Feedback & Contributions
+-----------
+We are happy for any feedback or feature requests. Please contact springer@aices.rwth-aachen.de.
+
+We also welcome any contributions to the code base.
