@@ -231,7 +231,7 @@ def getCompilerVersion(compiler):
         proc = subprocess.Popen([comp, version],stdout=subprocess.PIPE)
         proc.wait()
     except OSError:
-        print FAIL + "[TTC] ERROR: icpc command not known." +ENDC
+        print FAIL + "[TTC] ERROR: compiler '%s' not known. Please select a different compiler via --compiler=... "%comp +ENDC
         exit(-1)
 
     output = proc.communicate()[0].split("\n")
@@ -643,12 +643,19 @@ def getLdb(size, perm):
 
 def generateTransposition( ttcArgs ):
 
-    if( ttcArgs.architecture != "avx" and ttcArgs.floatTypeA != ttcArgs.floatTypeB ):
-        print FAIL + "[TTC] ERROR: mixed precision not yet supported for this architecture." + ENDC
+    compiler_version = getCompilerVersion(ttcArgs.compiler)
+
+    if( ttcArgs.architecture != "avx" and ttcArgs.floatTypeA != ttcArgs.floatTypeB):
+        print FAIL + "[TTC] ERROR: Mixed precision is currently only supported for avx-enabled processors."
         exit(-1)
-    if( ttcArgs.architecture == "knc" and ttcArgs.hostName == "" ):
-        print FAIL + "[TTC] ERROR: you are using the KNC please specify the hostname of the KNC card (e.g., --hostname=cluster-phi-mic0)" + ENDC
+    if( (ttcArgs.architecture == "knc" or ttcArgs.architecture == "avx512" or ttcArgs.architecture == "power") and ttc.floatTypeA != "float"):
+        print FAIL + "[TTC] ERROR: the selected architecture doesn't support the selected precision yet."
         exit(-1)
+    if( (ttcArgs.architecture == "knc") and ttcArgs.hostName == "" ):
+        print FAIL + "[TTC] ERROR: you are using the KNC or KNL please specify the hostname of the target card (e.g., --hostname=cluster-phi-mic0)" + ENDC
+        exit(-1)
+    if( (ttcArgs.architecture == "avx512") and ttcArgs.hostName == "" ):
+        print WARNING + "[TTC] WARNING: you are trying to generate code for an avx512-enabled processor. This could be either the host or a KNL coprocessor. In the latter case you have to specify the hostname of the target card via --hostname=<card name>." + ENDC
 
     if ttcArgs.maxNumImplementations == -1:
         ttcArgs.maxNumImplementations = 10000000
@@ -729,13 +736,6 @@ def generateTransposition( ttcArgs ):
     ###########################################
     # sanity check
     ###########################################
-    ###########################################
-    if( ttcArgs.architecture != "avx" and ttc.floatTypeA != ttc.floatTypeB):
-        print FAIL + "[TTC] ERROR: Mixed precision is currently only supported for avx-enabled processors."
-        exit(-1)
-    if( (ttcArgs.architecture == "avx512" or ttcArgs.architecture == "power") and ttc.floatTypeA != "float"):
-        print FAIL + "[TTC] ERROR: the selected architecture doesn't support the selected precision yet."
-        exit(-1)
 
     if(ttcArgs.lda[0] != 1 or ttcArgs.ldb[0] != 1):
         print FAIL + "[TTC] ERROR: the stride for the leading dimension of A and B must be 1" + ENDC
@@ -1046,7 +1046,6 @@ def generateTransposition( ttcArgs ):
         ###########################################
         if( ttcArgs.updateDatabase and solutionFound == 0):
 
-            compiler_version = getCompilerVersion(ttcArgs.compiler)
             version = getVersion()
             host = socket.gethostname()
             dim = len(ttcArgs.idxPerm)
