@@ -1,4 +1,10 @@
 import copy
+import subprocess
+
+OKGREEN = '\033[92m'
+FAIL = '\033[91m'
+WARNING = '\033[93m'
+ENDC = '\033[0m'
 
 class TTCargs:
     def __init__ (self,idxPerm, size):
@@ -148,4 +154,27 @@ def fuseIndices(size, perm, loopPermutations, lda, ldb):
                 k +=1
         for i in range(len(removeList)):
             loopOrder.remove(removeList[i])
+
+def getCompilerVersion(compiler):
+    comp = ""
+    if( compiler == "intel" ):
+        comp = "icpc"
+    if( compiler == "gcc" ):
+        comp = "g++"
+    if( compiler == "ibm" ):
+        comp = "bgxlc"
+    if( compiler == "nvcc"):
+	comp = "nvcc"
+    try:
+        version = "--version"
+        if( compiler == "ibm" ):
+            version = "-qversion"
+        proc = subprocess.Popen([comp, version],stdout=subprocess.PIPE)
+        proc.wait()
+    except OSError:
+        print FAIL + "[TTC] ERROR: compiler '%s' not known. Please select a different compiler via --compiler=... "%comp +ENDC
+        exit(-1)
+
+    output = proc.communicate()[0].split("\n")
+    return output[0]
 

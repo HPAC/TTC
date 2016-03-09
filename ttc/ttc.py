@@ -214,28 +214,6 @@ def getVersion():
     f.close()
     return -1 
 
-def getCompilerVersion(compiler):
-    comp = ""
-    if( compiler == "intel" ):
-        comp = "icpc"
-    if( compiler == "gcc" ):
-        comp = "g++"
-    if( compiler == "ibm" ):
-        comp = "bgxlc"
-    if( compiler == "nvcc"):
-	comp = "nvcc"
-    try:
-        version = "--version"
-        if( compiler == "ibm" ):
-            version = "-qversion"
-        proc = subprocess.Popen([comp, version],stdout=subprocess.PIPE)
-        proc.wait()
-    except OSError:
-        print FAIL + "[TTC] ERROR: compiler '%s' not known. Please select a different compiler via --compiler=... "%comp +ENDC
-        exit(-1)
-
-    output = proc.communicate()[0].split("\n")
-    return output[0]
 
 def createBestView(cursor, topXpercent):
     if(topXpercent < 0 or topXpercent > 100):
@@ -643,7 +621,7 @@ def getLdb(size, perm):
 
 def generateTransposition( ttcArgs ):
 
-    compiler_version = getCompilerVersion(ttcArgs.compiler)
+    compiler_version = ttc_util.getCompilerVersion(ttcArgs.compiler)
 
     if( ttcArgs.architecture != "avx" and ttcArgs.floatTypeA != ttcArgs.floatTypeB):
         print FAIL + "[TTC] ERROR: Mixed precision is currently only supported for avx-enabled processors."
