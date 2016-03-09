@@ -86,7 +86,7 @@ The benchmark uses a default tensor size of 200 MiB (see _sizeMB variable)
 # Citations
 -----------
 In case you want refer to TTC as part of a research paper, please cite the following
-article:
+article [(pdf)](http://arxiv.org/pdf/1603.02297v1):
 ```
 @article{ttc2016a,
    author      = {Paul Springer and Jeff R. Hammond and Paolo Bientinesi},
@@ -94,6 +94,6 @@ article:
    journal     = {Arxiv},
    year        = {2016},
    issue_date  = {March 2016},
-   url         = {http://arxiv.org/abs/TBA}
+   url         = {http://arxiv.org/abs/1603.02297}
 }
 ``` 
