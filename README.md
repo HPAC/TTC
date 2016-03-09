@@ -62,7 +62,7 @@ Please run **ttc --help** to get an overview of TTC's parameters.
 
 Here is one exemplary input to TTC: 
 
-    ttc --perm=1,0,2 --size=1000,768,16 --floatType=s --alpha=1.0 --beta=1.0 --numThreads=20
+    ttc --perm=1,0,2 --size=1000,768,16 --dataType=s --alpha=1.0 --beta=1.0 --numThreads=20
 
 # Requirements
 --------------
