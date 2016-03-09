@@ -45,7 +45,7 @@ Clone the repository into the newly created directory:
 Install TTC:
 
     cd $TTC_ROOT
-    python setup.py --user
+    python setup.py install --user
 
 Make sure that the installed script can be found in your path. You might have to
    
@@ -62,7 +62,7 @@ Please run **ttc --help** to get an overview of TTC's parameters.
 
 Here is one exemplary input to TTC: 
 
-    ttc --perm=1,0,2 --size=1000,768,16 --floatType=s --alpha=1.0 --beta=1.0 --numThreads=20
+    ttc --perm=1,0,2 --size=1000,768,16 --dataType=s --alpha=1.0 --beta=1.0 --numThreads=20
 
 # Requirements
 --------------
