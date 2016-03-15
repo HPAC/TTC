@@ -20,7 +20,7 @@ def getSizeId(cursor, size):
         cursor.execute(command)
     except sqlite3.Error as e:
         print command
-        print FAIL + "ERROR (sql):", e.args[0], ENDC
+        print FAIL + "[TTC] ERROR (sql):", e.args[0], ENDC
         return -1
 
     result = cursor.fetchall() 
@@ -44,7 +44,7 @@ def getPermId(cursor, perm):
         cursor.execute(command)
     except sqlite3.Error as e:
         print command
-        print FAIL + "ERROR (sql):", e.args[0], ENDC
+        print FAIL + "[TTC] ERROR (sql):", e.args[0], ENDC
         return -1
 
     result = cursor.fetchall() 
@@ -67,7 +67,7 @@ def getMeasurementId(cursor, sizeId, permId, floatTypeA, floatTypeB, beta, numTh
         cursor.execute(command)
     except sqlite3.Error as e:
         print command
-        print FAIL + "ERROR (sql):", e.args[0], ENDC
+        print FAIL + "[TTC] ERROR (sql):", e.args[0], ENDC
         return -1
 
     result = cursor.fetchall() 
@@ -85,7 +85,7 @@ def getBestImplementation(cursor, measurementId):
         cursor.execute(command)
     except sqlite3.Error as e:
         print command
-        print FAIL + "ERROR (sql):", e.args[0], ENDC
+        print FAIL + "[TTC] ERROR (sql):", e.args[0], ENDC
         return -1
 
     result = cursor.fetchall() 
@@ -108,8 +108,8 @@ def getLoopPermFrom(cursor, loopId, dim):
     try:
         cursor.execute(command)
     except sqlite3.Error as e:
-        print commmand
-        print FAIL + "ERROR (sql):", e.args[0], ENDC
+        print command
+        print FAIL + "[TTC] ERROR (sql):", e.args[0], ENDC
         return -1
 
     result = cursor.fetchall() 

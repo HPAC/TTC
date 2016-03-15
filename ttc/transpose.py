@@ -401,8 +401,6 @@ class implementation:
     def printHeader(self, headerFlag = 1, clean = 0):
         self.code +=  self.getHeader(headerFlag, clean)
 
-
-
     def declareVariables(self):
         for i in range(self.dim):
             self.code +=  "%sconst int size%d = %d;\n"%(self.indent,i,self.size[i])
@@ -433,12 +431,11 @@ class implementation:
         return self.cost
 
 
-    def getImplementation(self, parallel = 1, attainedBW = 0.0):
+    def getImplementation(self, parallel = 1, clean = 0):
 
         self.code = ""
 
-        if( attainedBW != 0.0):
-            #self.code += "//Attained Bandwidth: %f GiB/s\n"%attainedBW
+        if( clean ):
             self.printHeader(0,1)
         else:
             self.printHeader(0)

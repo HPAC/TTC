@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import traceback
 import multiprocessing
 import sqlite3
 import transposeGenerator as tg
@@ -233,7 +234,8 @@ def createBestView(cursor, topXpercent):
     try:
         cursor.execute(command)
     except sqlite3.Error as e:
-        print FAIL + "ERROR (sql):", e.args[0], ENDC
+        print FAIL + "[TTC] ERROR (sql):", e.args[0], ENDC
+        traceback.print_stack()   
         exit(-1)
 def createTables(cursor):
 
@@ -255,6 +257,7 @@ def createTables(cursor):
         cursor.execute(command)
     except sqlite3.Error as e:
         print FAIL + "ERROR (sql):", e.args[0], ENDC
+        traceback.print_stack()   
         exit(-1)
 
 
@@ -276,6 +279,7 @@ def createTables(cursor):
         cursor.execute(command)
     except sqlite3.Error as e:
         print FAIL + "ERROR (sql):", e.args[0], ENDC
+        traceback.print_stack()   
         exit(-1)
 
 
@@ -309,6 +313,7 @@ def createTables(cursor):
         cursor.execute(command)
     except sqlite3.Error as e:
         print FAIL + "ERROR (sql):", e.args[0], ENDC
+        traceback.print_stack()   
         exit(-1)
 
 
@@ -331,6 +336,7 @@ def createTables(cursor):
         cursor.execute(command)
     except sqlite3.Error as e:
         print FAIL + "ERROR (sql):", e.args[0], ENDC
+        traceback.print_stack()   
         exit(-1)
 
 
@@ -356,6 +362,7 @@ def createTables(cursor):
         cursor.execute(command)
     except sqlite3.Error as e:
         print FAIL + "ERROR (sql):", e.args[0], ENDC
+        traceback.print_stack()   
         exit(-1)
 
     command = """
@@ -368,7 +375,9 @@ def createTables(cursor):
     try:
         cursor.execute(command)
     except sqlite3.Error as e:
+        print command
         print FAIL + "ERROR (sql):", e.args[0], ENDC
+        traceback.print_stack()   
         exit(-1)
 
 
@@ -420,7 +429,7 @@ def getLastPrimaryKey(cursor, _logFile):
         cursor.execute(command)
     except sqlite3.Error as e:
         print FAIL + "ERROR (sql):", e.args[0], ENDC
-        _logFile.write(FAIL+"[Error]: ", e.args[0] + ENDC)
+        traceback.print_stack()   
         exit(-1)
     result = cursor.fetchall() 
     return result[0][0]
@@ -447,7 +456,9 @@ def insertIntoMeasurements(cursor, dim, host, version, alpha, beta,
     try:
         cursor.execute(command)
     except sqlite3.Error as e:
-        print FAIL + "ERROR (sql):", e.args[0], ENDC
+        print command
+        print FAIL + "[TTC] ERROR (sql):", e.args[0], ENDC
+        traceback.print_stack()   
         exit(-1)
     primaryKey = getLastPrimaryKey(cursor, _logFile)
     return primaryKey
@@ -466,8 +477,9 @@ def insertIntoSize(cursor, size, _logFile):
     try:
         cursor.execute(command)
     except sqlite3.Error as e:
-        print FAIL + "ERROR (sql):", e.args[0], ENDC
-        _logFile.write(FAIL+"[Error]: ", e.args[0] + ENDC)
+        print command
+        print FAIL + "[TTC] ERROR (sql):", e.args[0], ENDC
+        traceback.print_stack()   
         exit(-1)
     result = cursor.fetchall() 
 
@@ -489,8 +501,9 @@ def insertIntoSize(cursor, size, _logFile):
         try:
             cursor.execute(command)
         except sqlite3.Error as e:
-            print FAIL + "ERROR (sql):", e.args[0], ENDC
-            _logFile.write(FAIL+"[Error]: ", e.args[0] + ENDC)
+            print command
+            print FAIL + "[TTC] ERROR (sql):", e.args[0], ENDC
+            traceback.print_stack()   
             exit(-1)
         primaryKey = getLastPrimaryKey(cursor, _logFile)
         return primaryKey
@@ -509,8 +522,9 @@ def insertIntoPermutation(cursor, perm, _logFile):
     try:
         cursor.execute(command)
     except sqlite3.Error as e:
-        print FAIL + "ERROR (sql):", e.args[0], ENDC
-        _logFile.write(FAIL+"[Error]: ", e.args[0] + ENDC)
+        print command
+        print FAIL + "[TTC] ERROR (sql):", e.args[0], ENDC
+        traceback.print_stack()   
         exit(-1)
     result = cursor.fetchall() 
 
@@ -532,8 +546,9 @@ def insertIntoPermutation(cursor, perm, _logFile):
         try:
             cursor.execute(command)
         except sqlite3.Error as e:
-            print FAIL + "ERROR (sql):", e.args[0], ENDC
-            _logFile.write(FAIL+"[Error]: ", e.args[0] + ENDC)
+            print command
+            print FAIL + "[TTC] ERROR (sql):", e.args[0], ENDC
+            traceback.print_stack()   
             exit(-1)
         primaryKey = getLastPrimaryKey(cursor, _logFile)
         return primaryKey
@@ -553,8 +568,9 @@ def insertIntoLoopOrder(cursor, loopOrder, _logFile):
     try:
         cursor.execute(command)
     except sqlite3.Error as e:
-        print FAIL + "ERROR (sql):", e.args[0], ENDC
-        _logFile.write(FAIL+"[Error]: ", e.args[0] + ENDC)
+        print command
+        print FAIL + "[TTC] ERROR (sql):", e.args[0], ENDC
+        traceback.print_stack()   
         exit(-1)
     result = cursor.fetchall() 
 
@@ -576,8 +592,9 @@ def insertIntoLoopOrder(cursor, loopOrder, _logFile):
         try:
             cursor.execute(command)
         except sqlite3.Error as e:
-            print FAIL + "ERROR (sql):", e.args[0], ENDC
-            _logFile.write(FAIL+"[Error]: ", e.args[0] + ENDC)
+            print command
+            print FAIL + "[TTC] ERROR (sql):", e.args[0], ENDC
+            traceback.print_stack()   
             exit(-1)
         primaryKey = getLastPrimaryKey(cursor, _logFile)
         return primaryKey
@@ -601,8 +618,9 @@ def insertIntoVariant(cursor, blockA, blockB, prefetchDistance,
     try:
         cursor.execute(command)
     except sqlite3.Error as e:
-        print FAIL + "ERROR (sql):", e.args[0], ENDC
-        _logFile.write(FAIL+"[Error]: ", e.args[0] + ENDC)
+        print command
+        print FAIL + "[TTC] ERROR (sql):", e.args[0], ENDC
+        traceback.print_stack()   
         exit(-1)
     primaryKey = getLastPrimaryKey(cursor, _logFile)
     return primaryKey
@@ -781,6 +799,7 @@ def generateTransposition( ttcArgs ):
                     fastestVersionBW = ret[4]
                     if(fastestVersionBW <= 0):
                         print "ERROR: bandwidth not stored in database\n"
+                        traceback.print_stack()   
                         exit(-1)
                     ret = sql_util.getLoopPermFrom(cursor, loopId, len(ttcArgs.size))
                     if( ttcArgs.idxPerm[0] == 0 ): #the first index will always be within our kernel (i.e., it will always be the inner-most loop)
@@ -797,6 +816,9 @@ def generateTransposition( ttcArgs ):
                             print "Solution already exists: generating the solution which was found previously."
                             printEpilog(transposeName, ttcArgs.beta)
 
+#    if( solutionFound == 0):
+#        print sizeId, ttcArgs.size, ttcArgs.idxPerm
+#        exit(-1)
     ###########################################
     # generate all versions
     ###########################################
@@ -816,170 +838,173 @@ def generateTransposition( ttcArgs ):
                 ttcArgs.architecture, _mpi, ttcArgs.lda, ttcArgs.ldb, ttcArgs.silent, ttcArgs.hotA, ttcArgs.hotB )
 
 
-
     generator.generate()
     numSolutions = generator.getNumSolutions() + 1#account for reference version
     if( ttcArgs.silent != 1):
         print "Generation of %d implementations took %f seconds "%(numSolutions,_time.time() - t0)
 
+    emitReference = 0
+    measuringTime = 0
+    compilationTime = 0
     if _generateOnly == 0:
         if( solutionFound == 0 ): #only compile and measure if we have not found the best solution in our database yet
-            compilationTime = 0
-            ###########################################
-            # compile all versions
-            ###########################################
-            if( ttcArgs.silent != 1):
-                print "[make] Compile all versions"
-            t0 = _time.time()
-            numThreadsCompile = max(2, multiprocessing.cpu_count()/2)
-            if ttcArgs.debug == 0:
-                if( _mpi ):
-                    if( ttcArgs.architecture == "knc" or ttcArgs.architecture == "avx512" ):
-                        print "[TTC] ERROR: knc + mpi not supported yet."
-                        exit(-1)
-                    ret = subprocess.call(["make", "-j%d"%numThreadsCompile , "mpi"], stdout=DEVNULL, stderr=subprocess.STDOUT)
-                else:
-                    if( ttcArgs.architecture == "knc" ):
-                        ret = subprocess.call(["make", "-j%d"%numThreadsCompile, ttcArgs.architecture], stdout=DEVNULL, stderr=subprocess.STDOUT)
-                    else:
-                        ret = subprocess.call(["make", "-j%d"%numThreadsCompile, ttcArgs.compiler], stdout=DEVNULL, stderr=subprocess.STDOUT)
-            else:
-                if( _mpi ):
-                    if( ttcArgs.architecture == "knc" or ttcArgs.architecture == "avx512" ):
-                        print "[TTC] ERROR: knc + mpi not supported yet."
-                        exit(-1)
-                    ret = subprocess.call(["make", "-j%d"%numThreadsCompile, "mpi"])
-                else:
-                    if( ttcArgs.architecture == "knc"  or ttcArgs.architecture == "avx512"):
-                        ret = subprocess.call(["make", "-j%d"%numThreadsCompile, ttcArgs.architecture])
-                    else:
-                        ret = subprocess.call(["make", "-j%d"%numThreadsCompile, ttcArgs.compiler])
-            if ret != 0 :
-                print FAIL+"[Error] compilation failed. Retry with '-v' option to see the compilation errors." + ENDC
-                _logFile.write(FAIL+"[Error] compilation failed. Retry with '-v' option to see the compilation errors.\n" + ENDC)
-                exit(-1)
-            compilationTime = (_time.time() - t0)
-            if( ttcArgs.silent != 1):
-                print "Compilation took %f seconds"%compilationTime
-
-            ###########################################
-            # run versions
-            ###########################################
-            if( ttcArgs.silent != 1):
-                print "[running] measure runtime"
-
-            #set environment variables
-            my_env = os.environ.copy()
-	    if(ttcArgs.compiler != "nvcc"):
-                my_env["OMP_NUM_THREADS"] = str(ttcArgs.numThreads)
-                my_env["KMP_AFFINITY"] = ttcArgs.affinity 
-
-            t0 = _time.time()
-            outputTiming = []
-            if( _mpi ):
-                _numSockets = 2
-                proc = subprocess.Popen(["mpirun", "-n","%d"%_numSockets, "-env", "I_MPI_PIN", "1", "-env", "KMP_AFFINITY=verbose,compact", "-env", "OMP_NUM_THREADS=%d"%(ttcArgs.numThreads/_numSockets), "-env","I_MPI_PIN_DOMAIN=socket", "-env","I_MPI_PIN_CELL=core","./transpose.exe"],stderr=subprocess.STDOUT,stdout=subprocess.PIPE, env=my_env)
-            else:
-                if( ttcArgs.architecture == "knc" or ttcArgs.architecture == "avx512"):
-                    proc = subprocess.Popen(["ssh",_hostName,"source /etc/profile; KMP_AFFINITY=%s OMP_NUM_THREADS=%d  %s/transpose.exe"%(ttcArgs.affinity,ttcArgs.numThreads,_ttc_root)],stderr=subprocess.STDOUT,stdout=subprocess.PIPE, env=my_env, stdin=subprocess.PIPE)
-                else:
-                    proc = subprocess.Popen(['./transpose.exe'],stderr=subprocess.STDOUT,stdout=subprocess.PIPE, env=my_env)
-            counter = 0
-            counter2 = 0
-            failCount = 0
-            while True:
-                line = proc.stdout.readline()
-                line = line.lower()
-                outputTiming.append(line)
-
-                counter2 +=1 
-                if(line.find("variant") != -1 and line.find("took") != -1):
-                    counter +=1 
-                if( line.find("error") != -1 ):
-                    print FAIL + line + ENDC
-                    _logFile.write(FAIL + line + ENDC)
-                    failCount += 1
-                    break
-
-                if( counter2 > (numSolutions*2+10) or line.find("top-5") != -1 ):
-                    break
-
-                if ttcArgs.debug:
-                    print "%d / %d :"%(counter,numSolutions) + line[:-1]
-                    sys.stdout.flush()
-                else:
-                    sys.stdout.write("[TTC] %d out of %d implementations done.\r"%(counter,numSolutions))
-                    sys.stdout.flush()
-
-            proc.wait()
-            if proc.returncode != 0:
-                print proc.poll()
-                print FAIL+"[Error] runtime error.", ENDC
-                exit(-1)
-
-            if failCount == 0:
+            if( numSolutions > 1):
+                ###########################################
+                # compile all versions
+                ###########################################
                 if( ttcArgs.silent != 1):
-                    print OKGREEN + "[Success] all %d tests passed."%numSolutions, ENDC
-            else:
-                print FAIL + "[TTC_Error] %d out of %d tests failed."%(failCount, numSolutions), ENDC
+                    print "[make] Compile all versions"
+                t0 = _time.time()
+                numThreadsCompile = max(2, multiprocessing.cpu_count()/2)
+                if ttcArgs.debug == 0:
+                    if( _mpi ):
+                        if( ttcArgs.architecture == "knc" or ttcArgs.architecture == "avx512" ):
+                            print "[TTC] ERROR: knc + mpi not supported yet."
+                            exit(-1)
+                        ret = subprocess.call(["make", "-j%d"%numThreadsCompile , "mpi"], stdout=DEVNULL, stderr=subprocess.STDOUT)
+                    else:
+                        if( ttcArgs.architecture == "knc" ):
+                            ret = subprocess.call(["make", "-j%d"%numThreadsCompile, ttcArgs.architecture], stdout=DEVNULL, stderr=subprocess.STDOUT)
+                        else:
+                            ret = subprocess.call(["make", "-j%d"%numThreadsCompile, ttcArgs.compiler], stdout=DEVNULL, stderr=subprocess.STDOUT)
+                else:
+                    if( _mpi ):
+                        if( ttcArgs.architecture == "knc" or ttcArgs.architecture == "avx512" ):
+                            print "[TTC] ERROR: knc + mpi not supported yet."
+                            exit(-1)
+                        ret = subprocess.call(["make", "-j%d"%numThreadsCompile, "mpi"])
+                    else:
+                        if( ttcArgs.architecture == "knc"  or ttcArgs.architecture == "avx512"):
+                            ret = subprocess.call(["make", "-j%d"%numThreadsCompile, ttcArgs.architecture])
+                        else:
+                            ret = subprocess.call(["make", "-j%d"%numThreadsCompile, ttcArgs.compiler])
+                if ret != 0 :
+                    print FAIL+"[Error] compilation failed. Retry with '-v' option to see the compilation errors." + ENDC
+                    _logFile.write(FAIL+"[Error] compilation failed. Retry with '-v' option to see the compilation errors.\n" + ENDC)
+                    exit(-1)
+                compilationTime = (_time.time() - t0)
+                if( ttcArgs.silent != 1):
+                    print "Compilation took %f seconds"%compilationTime
 
-            fastestVersion = "-1"
-            fastestVersionTime = 1000000000000000.0
-            fastestVersionBW = 0
-            top1Speedup = 0
-            top5Speedup = 0
-            referenceBw = -1
-            #pick fastest version
-            for line in outputTiming:
-                tokens = line.split()
-                if( line.find("reference version") != -1 ):
-                    referenceBw = float(tokens[7])
-                    if( float(tokens[4]) < fastestVersionTime ):
-                        fastestVersion = tokens[2]
-                        fastestVersionBW = float(tokens[7])
+                ###########################################
+                # run versions
+                ###########################################
+                if( ttcArgs.silent != 1):
+                    print "[running] measure runtime"
+
+                #set environment variables
+                my_env = os.environ.copy()
+                if(ttcArgs.compiler != "nvcc"):
+                    my_env["OMP_NUM_THREADS"] = str(ttcArgs.numThreads)
+                    my_env["KMP_AFFINITY"] = ttcArgs.affinity 
+
+                t0 = _time.time()
+                outputTiming = []
+                if( _mpi ):
+                    _numSockets = 2
+                    proc = subprocess.Popen(["mpirun", "-n","%d"%_numSockets, "-env", "I_MPI_PIN", "1", "-env", "KMP_AFFINITY=verbose,compact", "-env", "OMP_NUM_THREADS=%d"%(ttcArgs.numThreads/_numSockets), "-env","I_MPI_PIN_DOMAIN=socket", "-env","I_MPI_PIN_CELL=core","./transpose.exe"],stderr=subprocess.STDOUT,stdout=subprocess.PIPE, env=my_env)
+                else:
+                    if( ttcArgs.architecture == "knc" or ttcArgs.architecture == "avx512"):
+                        proc = subprocess.Popen(["ssh",_hostName,"source /etc/profile; KMP_AFFINITY=%s OMP_NUM_THREADS=%d  %s/transpose.exe"%(ttcArgs.affinity,ttcArgs.numThreads,_ttc_root)],stderr=subprocess.STDOUT,stdout=subprocess.PIPE, env=my_env, stdin=subprocess.PIPE)
+                    else:
+                        proc = subprocess.Popen(['./transpose.exe'],stderr=subprocess.STDOUT,stdout=subprocess.PIPE, env=my_env)
+                counter = 0
+                counter2 = 0
+                failCount = 0
+                while True:
+                    line = proc.stdout.readline()
+                    line = line.lower()
+                    outputTiming.append(line)
+
+                    counter2 +=1 
+                    if(line.find("variant") != -1 and line.find("took") != -1):
+                        counter +=1 
+                    if( line.find("error") != -1 ):
+                        print FAIL + line + ENDC
+                        _logFile.write(FAIL + line + ENDC)
+                        failCount += 1
+                        break
+
+                    if( counter2 > (numSolutions*2+10) or line.find("top-5") != -1 ):
+                        break
+
+                    if ttcArgs.debug:
+                        print "%d / %d :"%(counter,numSolutions) + line[:-1]
+                        sys.stdout.flush()
+                    else:
                         if( ttcArgs.silent != 1):
-                            print "Reference version attains %f GiB/s."%(referenceBw)
-                elif( len(tokens) >= 7  and tokens[0] == "variant" and tokens[2] == "took" ):
+                            sys.stdout.write("[TTC] %d out of %d implementations done.\r"%(counter,numSolutions))
+                        sys.stdout.flush()
+
+                proc.wait()
+                if proc.returncode != 0:
+                    print proc.poll()
+                    print FAIL+"[Error] runtime error.", ENDC
+                    exit(-1)
+
+                if failCount == 0:
                     if( ttcArgs.silent != 1):
-                        print "Version %s attains %f GiB/s."%(tokens[1],float(tokens[6]))
-                    if( float(tokens[3]) < fastestVersionTime ):
-                        fastestVersion = tokens[1]
-                        fastestVersionTime = float(tokens[3])
-                        fastestVersionBW = float(tokens[6])
-                if( len(tokens) == 3 and tokens[0] == "Top-1" ):
-                    top1Speedup = float(tokens[2])
-                if( len(tokens) == 3 and tokens[0] == "Top-5" ):
-                    top5Speedup = float(tokens[2])
+                        print OKGREEN + "[Success] all %d tests passed."%numSolutions, ENDC
+                else:
+                    print FAIL + "[TTC_Error] %d out of %d tests failed."%(failCount, numSolutions), ENDC
 
-            if(fastestVersionBW < referenceBw and ttcArgs.compiler!="nvcc" ): #fallback to reference version if this is the fastest
-                fastestVersionBW = referenceBw
-                fastestVersion = "reference"
-                numSolutions = 1 #force generation of reference version (see line 945)
+                fastestVersion = "-1"
+                fastestVersionTime = 1000000000000000.0
+                fastestVersionBW = 0
+                top1Speedup = 0
+                top5Speedup = 0
+                referenceBw = -1
+                #pick fastest version
+                for line in outputTiming:
+                    tokens = line.split()
+                    if( line.find("reference version") != -1 ):
+                        referenceBw = float(tokens[7])
+                        if( float(tokens[4]) < fastestVersionTime ):
+                            fastestVersion = tokens[2]
+                            fastestVersionBW = float(tokens[7])
+                            if( ttcArgs.silent != 1):
+                                print "Reference version attains %f GiB/s."%(referenceBw)
+                    elif( len(tokens) >= 7  and tokens[0] == "variant" and tokens[2] == "took" ):
+                        if( ttcArgs.silent != 1):
+                            print "Version %s attains %f GiB/s."%(tokens[1],float(tokens[6]))
+                        if( float(tokens[3]) < fastestVersionTime ):
+                            fastestVersion = tokens[1]
+                            fastestVersionTime = float(tokens[3])
+                            fastestVersionBW = float(tokens[6])
+                    if( len(tokens) == 3 and tokens[0] == "Top-1" ):
+                        top1Speedup = float(tokens[2])
+                    if( len(tokens) == 3 and tokens[0] == "Top-5" ):
+                        top5Speedup = float(tokens[2])
 
-                #build string for reference version
-                variant = "v"
-                for i in ttcArgs.idxPerm[-1::-1]:
-                    variant += str(i)
-                variant += "_1x1"
-                outputTiming = ["variant %s took -1 and achieved %.2f GiB/s (blocking rank: 0) (loop rank: 0) (l2 misses: 0) (invalidates: 0)"%(variant,fastestVersionBW) ]
+                if(fastestVersionBW < referenceBw and ttcArgs.compiler!="nvcc" ): #fallback to reference version if this is the fastest
+                    fastestVersionBW = referenceBw
+                    fastestVersion = "reference"
+                    emitReference = 1 #force generation of reference version (see line 945)
 
-            measuringTime = (_time.time() - t0)
-            if( ttcArgs.silent != 1):
-                print "Measuring took %f seconds"%measuringTime
-                if( referenceBw > 0 ):
-                    print "Speedup over reference: %.2f"%(fastestVersionBW/referenceBw)
-                print "\nThe fastest version (%s) attains %f GiB/s.\n"%(fastestVersion,fastestVersionBW)
+                    #build string for reference version
+                    variant = "v"
+                    for i in ttcArgs.idxPerm[-1::-1]:
+                        variant += str(i)
+                    variant += "_1x1"
+                    outputTiming.append("variant %s took -1 and achieved %.2f GiB/s (blocking rank: 0) (loop rank: 0) (l2 misses: 0) (invalidates: 0)"%(variant,fastestVersionBW))
+
+                measuringTime = (_time.time() - t0)
+                if( ttcArgs.silent != 1):
+                    print "Measuring took %f seconds"%measuringTime
+                    if( referenceBw > 0 ):
+                        print "Speedup over reference: %.2f"%(fastestVersionBW/referenceBw)
+                    print "\nThe fastest version (%s) attains %f GiB/s.\n"%(fastestVersion,fastestVersionBW)
 
         ###########################################
         # save fastest version to file
         ###########################################
         if( solutionFound == 1):
             fastestVersion = generator.implementations[-1].getVersionName()
-        if( numSolutions > 1):
-            code = generator.generate(fastestVersion, fastestVersionBW)
-        else: #only print reference implementation
+        if( emitReference or numSolutions == 1):
             code = (generator.referenceImplementation.getImplementation(_parallelize), generator.referenceImplementation.getHeader())
             transposeName = generator.referenceImplementation.getTransposeName()
+        else: 
+            code = generator.generateVersion(fastestVersion)
         if( len(code) > 1):
             directory = workingDir +"/ttc_transpositions"
             if not os.path.exists(directory):
@@ -1022,7 +1047,7 @@ def generateTransposition( ttcArgs ):
         ###########################################
         # update Database
         ###########################################
-        if( ttcArgs.updateDatabase and solutionFound == 0):
+        if( ttcArgs.updateDatabase and solutionFound == 0 and numSolutions > 1):
 
             version = getVersion()
             host = socket.gethostname()
@@ -1038,13 +1063,10 @@ def generateTransposition( ttcArgs ):
             #update perm table
             perm_id = insertIntoPermutation(cursor, ttcArgs.idxPerm, _logFile )
 
-            if( referenceBw == -1 ):
-                print FAIL+"[Error] bandwidth of reference version not found.", ENDC
-                
             #update measurements table
             measurement_id = insertIntoMeasurements(cursor,dim, host, version, ttcArgs.alpha,
-                    ttcArgs.beta, ttcArgs.numThreads, compiler_version, ttcArgs.floatTypeA, ttcArgs.floatTypeB,top1Speedup,
-                    top5Speedup, compilationTime, measuringTime, size_id, perm_id,
+                    ttcArgs.beta, ttcArgs.numThreads, compiler_version, ttcArgs.floatTypeA, ttcArgs.floatTypeB,0,
+                    0, compilationTime, measuringTime, size_id, perm_id,
                     _logFile, referenceBw, ttcArgs.hotA, ttcArgs.hotB, ttc_util.getCPUarchitecture()) #ttcArgs.architecture)
 
 

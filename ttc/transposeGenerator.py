@@ -143,10 +143,6 @@ class transposeGenerator:
                     if( self.size[0] >= blocking[0] and self.size[self.perm[0]] >= blocking[1] ):
                         self.blockings.append(blocking)
 
-                if( len(self.blockings) == 0 ):
-                    print WARNING+ "WARNING: non of the specified blockings is applicable. Reverting to default blocking (%dx%d)."%(minA,minB) + ENDC
-                    self.blockings.append((minA,minB))
-
         if( len(self.blockings) == 0): #this is needed to find solutions for which the size is smaller than the smallest blocking
             self.blockings.append((minA,minB))
 
@@ -248,33 +244,32 @@ class transposeGenerator:
     def getNumSolutions(self):
         return len(self.implementations)
 
-    def generate(self, versionStr = "", attainedBW = 0.0):
-        if( versionStr == "" ):
-            if( len(self.size) != 1 and ( not(self.perm[0] == 0 and self.perm[1] == 1)) ): #only use code generator if at least one of the first two indices changes
-                self.getSolutions()
-            self.printMain()
-            self.generateImplementations()
-        else:
-            #used to generate a specific implementation
-            for impl in self.implementations:
-                if( impl.getVersionName() == versionStr ):
-                    prefetchDistances = list(set([impl.getPrefetchDistance(), 0])) #we need prefetch distance 0 for the remainder while-loop
-                    code = "#if defined(__ICC) || defined(__INTEL_COMPILER)\n"
-                    code += "#define INLINE __forceinline\n"
-                    code += "#elif defined(__GNUC__) || defined(__GNUG__)\n"
-                    code += "#define INLINE __attribute__((always_inline))\n"
-                    code += "#endif\n\n"
-                    if(prefetchDistances>0):
-                        code += "#include <queue>\n"
-                        code += "struct Offset\n{\n"
-                        code += "   int offsetA;\n"
-                        code += "   int offsetB;\n"
-                        code += "};\n\n"
-                    code += self.generateTranspositionKernel([impl.getBlocking()],prefetchDistances, 1)[0]
-                    return (code + impl.getImplementation(self.parallelize, attainedBW ), impl.getHeader(1, 1))
-            return ""
+    def generateVersion(self,versionStr):
+        #used to generate a specific implementation
+        for impl in self.implementations:
+            if( impl.getVersionName() == versionStr ):
+                prefetchDistances = list(set([impl.getPrefetchDistance(), 0])) #we need prefetch distance 0 for the remainder while-loop
+                code = "#if defined(__ICC) || defined(__INTEL_COMPILER)\n"
+                code += "#define INLINE __forceinline\n"
+                code += "#elif defined(__GNUC__) || defined(__GNUG__)\n"
+                code += "#define INLINE __attribute__((always_inline))\n"
+                code += "#endif\n\n"
+                if(prefetchDistances>0):
+                    code += "#include <queue>\n"
+                    code += "struct Offset\n{\n"
+                    code += "   int offsetA;\n"
+                    code += "   int offsetB;\n"
+                    code += "};\n\n"
+                code += self.generateTranspositionKernel([impl.getBlocking()],prefetchDistances, 1)[0]
+                return (code + impl.getImplementation(self.parallelize, clean=1 ), impl.getHeader(1, 1))
+        return ""
 
-
+    def generate(self):
+        if( len(self.size) != 1 and ( not(self.perm[0] == 0 and self.perm[1] == 1)) ): #only use code generator if at least one of the first two indices changes
+            self.getSolutions()
+        self.printMain()
+        self.generateImplementations()
+            
 
     def __getFloatTypeSize(self, floatType):
         if( floatType == "float" ):
@@ -322,7 +317,8 @@ class transposeGenerator:
                     for opt in optimizations:
                     
                         counter += 1
-                        sys.stdout.write("[TTC] Implementations generated so far: %d                    \r"%counter)
+                        if( self.silent != 1):
+                            sys.stdout.write("[TTC] Implementations generated so far: %d                    \r"%counter)
                         sys.stdout.flush()
                         implementation = transpose.implementation(blocking, loopPerm,
                                 self.perm, self.size, self.alpha, self.beta, self.floatTypeA, self.floatTypeB,
@@ -567,7 +563,7 @@ class transposeGenerator:
         code +="   ret += posix_memalign((void**) &B_copy, %d, sizeof(%s) * total_size);\n"%(self.alignmentRequirement, self.floatTypeB)
         code +="   ret += posix_memalign((void**) &A_copy, %d, sizeof(%s) * total_size);\n"%(self.alignmentRequirement, self.floatTypeA)
         code +="   ret += posix_memalign((void**) &B, %d, sizeof(%s) * total_size);\n"%(self.alignmentRequirement, self.floatTypeB)
-        code +="   if( ret != 0){ printf(\"ERROR: posix_memalign failed\\n\"); exit(-1); }\n"
+        code +="   if( ret != 0){ printf(\"[TTC] ERROR: posix_memalign failed\\n\"); exit(-1); }\n"
         code +="   const %s *A_const = A;\n"%(self.floatTypeA)
         code +="   const %s *B_copy_const = B_copy;\n"%(self.floatTypeB)
         code +="\n"
@@ -657,11 +653,12 @@ class transposeGenerator:
             code +="      double bandwidth = ((double)(elements_moved * (sizeof("+self.floatTypeA+") + 2.0 * sizeof("+self.floatTypeB+"))))/(1<<30)/(time);\n"
         else:
             code +="      double bandwidth = ((double)(elements_moved * (sizeof("+self.floatTypeA+") + 1.0 * sizeof("+self.floatTypeB+"))))/(1<<30)/(time);\n"
+        code +="      if( time <= 0.0) bandwidth = 100;\n" #if the transpose didn't take enough time too measure it, we just fix the bandwidth to 100 #TODO
         code +="      referenceBandwidth = bandwidth;\n"
         if( self.mpi ):
             code +="      referenceBandwidth *= numRanks;\n"
             code +="      if(rank == 0)\n"
-        code +="      printf(\"reference version %s took %%f and achieved %%.2f GB/s \\n\",time, referenceBandwidth );\n"%refVersionStr
+        code +="      printf(\"reference version %s took %%e and achieved %%.2f GB/s \\n\",time, referenceBandwidth );\n"%refVersionStr
         code +="      fflush(stdout);\n"
         code +="   }\n"
 
@@ -772,6 +769,7 @@ class transposeGenerator:
                     tmpCode +="      double bandwidth = ((double)(elements_moved * (sizeof("+self.floatTypeA+") + 2.0 * sizeof("+self.floatTypeB+"))))/(1<<30)/(time);\n"
                 else:
                     tmpCode +="      double bandwidth = ((double)(elements_moved * (sizeof("+self.floatTypeA+") + 1.0 * sizeof("+self.floatTypeB+"))))/(1<<30)/(time);\n"
+                tmpCode +="      if( time <= 0.0) bandwidth = 100;\n" #if the transpose didn't take enough time too measure it, we just fix the bandwidth to 100 #TODO
                 if( self.mpi ):
                     tmpCode +="      bandwidth *= numRanks;\n"
                 tmpCode +="      if( bandwidth > maxBandwidth ) maxBandwidth = bandwidth;\n"
@@ -788,7 +786,7 @@ class transposeGenerator:
 
                 if( self.mpi ):
                     tmpCode +="      if(rank == 0)\n"
-                tmpCode +="      printf(\"variant "+versionStr+" took %%f and achieved %%.2f GB/s (blocking rank: %d) (loop rank: %d) (l2 misses: %%f) (invalidates: %%f)\\n\",time, bandwidth,l2misses/((float)nRepeat),invalidates/((float)nRepeat));\n"%(blockingRank, loopRank)
+                tmpCode +="      printf(\"variant "+versionStr+" took %%e and achieved %%.2f GB/s (blocking rank: %d) (loop rank: %d) (l2 misses: %%f) (invalidates: %%f)\\n\",time, bandwidth,l2misses/((float)nRepeat),invalidates/((float)nRepeat));\n"%(blockingRank, loopRank)
                 tmpCode +="      fflush(stdout);\n"
                 tmpCode +="   }\n"
                 counter += 1
