@@ -18,6 +18,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import ttc_util
+import traceback
 import itertools
 import os
 import copy
@@ -253,14 +254,14 @@ class transposeGenerator:
                 code += "#elif defined(__GNUC__) || defined(__GNUG__)\n"
                 code += "#define INLINE __attribute__((always_inline))\n"
                 code += "#endif\n\n"
-                if(prefetchDistances>0):
+                if(len(prefetchDistances)>1):
                     code += "#include <queue>\n"
                     code += "struct Offset\n{\n"
                     code += "   int offsetA;\n"
                     code += "   int offsetB;\n"
                     code += "};\n\n"
-                code += self.generateTranspositionKernel([impl.getBlocking()],prefetchDistances, 1)[0]
-                return (code + impl.getImplementation(self.parallelize, clean=1 ), impl.getHeader(1, 1))
+                code += self.generateTranspositionKernel([impl.getBlocking()],prefetchDistances, 1, [impl.optimization])[0]
+                return code + impl.getImplementation(self.parallelize, clean=1 )
         return ""
 
     def generate(self):
@@ -1064,19 +1065,37 @@ class transposeGenerator:
     def getMicroKernelHeader(self,blocking, opt = "", prefetchDistance = 0, staticAndInline = 0):
         code = "//B_ji = alpha * A_ij + beta * B_ji\n"
         transposeMicroKernelname = "transpose%dx%d"%(blocking[0], blocking[1])
+
         if( opt != "" ):
             transposeMicroKernelname += "_"+ opt
+
+        if( prefetchDistance > 0):
+            transposeMicroKernelname += "_prefetch_%d"%prefetchDistance
+
+        if( staticAndInline ):
+            transposeMicroKernelname += "_"
+            for i in self.perm:
+                transposeMicroKernelname += str(i)
+  
+            transposeMicroKernelname +="_"
+            for idx in range(len(self.size)):
+                 transposeMicroKernelname += "%d"%(self.size[idx])
+                 if(idx != len(self.size)-1):
+                     transposeMicroKernelname +="x"
 
         static = ""
         if staticAndInline :
             static = "static INLINE "
         if( prefetchDistance > 0):
-            return code +static+"void %s_prefetch_%d(const %s* __restrict__ A, const int lda, %s* __restrict__ B, const int ldb, const %s* __restrict__ Anext0, %s* __restrict__ Bnext0, const %s* __restrict__ Anext1, %s* __restrict__ Bnext1%s)\n{\n"""%(transposeMicroKernelname, prefetchDistance, self.floatTypeA,self.floatTypeB, self.floatTypeA,self.floatTypeB, self.floatTypeA,self.floatTypeB,self.getBroadcastVariables(1))
+            return code +static+"void %s(const %s* __restrict__ A, const int lda, %s* __restrict__ B, const int ldb, const %s* __restrict__ Anext0, %s* __restrict__ Bnext0, const %s* __restrict__ Anext1, %s* __restrict__ Bnext1%s)\n{\n"""%(transposeMicroKernelname, self.floatTypeA,self.floatTypeB, self.floatTypeA,self.floatTypeB, self.floatTypeA,self.floatTypeB,self.getBroadcastVariables(1))
         else:
             if( self.perm[0] != 0):
                 return code +static+"void %s(const %s* __restrict__ A, const int lda, %s* __restrict__ B, const int ldb%s)\n{\n"%(transposeMicroKernelname, self.floatTypeA, self.floatTypeB,self.getBroadcastVariables(1))
             else:
-                return code +static+"void %s(const %s* __restrict__ A, int lda1, const int lda, %s* __restrict__ B, const int ldb1, const int ldb%s)\n{\n"%(transposeMicroKernelname, self.floatTypeA, self.floatTypeB,self.getBroadcastVariables(1))
+                if( staticAndInline ):
+                    return code +"template<int size0> void %s(const %s* __restrict__ A, int lda1, const int lda, %s* __restrict__ B, const int ldb1, const int ldb%s)\n{\n"%(transposeMicroKernelname, self.floatTypeA, self.floatTypeB,self.getBroadcastVariables(1))
+                else:
+                    return code +static+"void %s(const %s* __restrict__ A, int lda1, const int lda, %s* __restrict__ B, const int ldb1, const int ldb%s)\n{\n"%(transposeMicroKernelname, self.floatTypeA, self.floatTypeB,self.getBroadcastVariables(1))
 
 
     def getUpdateAndStore(self, streamingStores = 0):
@@ -1178,10 +1197,8 @@ class transposeGenerator:
 
        return code
 
-    def generateTranspositionKernel(self, blockings, prefetchDistances, staticAndInline=0):
+    def generateTranspositionKernel(self, blockings, prefetchDistances, staticAndInline=0, optimizations = []):
         loadKernelA = self.getLoadKernel("A","lda", self.floatTypeA, 0, 0, 1)
-
-        optimizations = self.getAppropriateOptimizations()
 
         ret = ""
         retHPP = ""
@@ -1258,10 +1275,21 @@ class transposeGenerator:
                                         #clustered together"
                                         code += self.getPrefetchCode(i,j,numBlocksA,
                                                 numBlocksB, prefetchDistance, opt)
-
                                     transposeName = "transpose%dx%d"%(blockA, blockB)
+
                                     if( opt != ""):
                                         transposeName += "_" + opt
+
+                                    if( staticAndInline ):
+                                        transposeName += "_"
+                                        for p in self.perm:
+                                            transposeName += str(p)
+                                  
+                                        transposeName +="_"
+                                        for idx in range(len(self.size)):
+                                             transposeName += "%d"%(self.size[idx])
+                                             if(idx != len(self.size)-1):
+                                                 transposeName +="x"
 
                                     code += self.indent + "//invoke micro-transpose\n"
                                     code += self.indent + "%s(A%s, lda, B%s, ldb%s);\n\n"%(transposeName, offsetA, offsetB,self.getBroadcastVariables(0))
@@ -1286,13 +1314,16 @@ class transposeGenerator:
                     indent += self.indent
                     if self.architecture != "power":
                         code += indent + "#pragma omp simd\n"
-                    code += indent + "for(int i0 = 0; i0 < %d; i0++)\n"%(self.size[0])
+                    if( staticAndInline ):
+                        code += indent + "for(int i0 = 0; i0 < size0; i0++)\n"
+                    else:
+                        code += indent + "for(int i0 = 0; i0 < %d; i0++)\n"%(self.size[0])
                     updateStr = ""
-                    outStr = "B[i0 + ib * ldb1 + ia * ldb]"#%self.ldb[1] #TODO ldb[1] instead of size[0] ?!? BUG?
+                    outStr = "B[i0 + ib * ldb1 + ia * ldb]"
                     if( len(self.size) == 1):
                         inStr = "A[i0]"
                     else:
-                        inStr = "A[i0 + ia * lda1 + ib * lda]"#%self.lda[1]
+                        inStr = "A[i0 + ia * lda1 + ib * lda]"
                     if( self.beta == 0.0 ):
                         updateStr +=  "%s%s = alpha * %s;\n"%(indent + self.indent, outStr, inStr)
                     else:
@@ -1373,7 +1404,8 @@ class transposeGenerator:
         #we need prefetch distance 0 for the remainder while-loop
         tmpPrefetchDistances.append(0)
         tmpPrefetchDistances = set( tmpPrefetchDistances )
-        (retCpp, retHpp) = self.generateTranspositionKernel(self.blockings, tmpPrefetchDistances)
+
+        (retCpp, retHpp) = self.generateTranspositionKernel(self.blockings, tmpPrefetchDistances, 0, self.getAppropriateOptimizations() )
         hppCode +=  retHpp
         hppCode += "void trashCache(double *A, double *B, int n);\n"
         hppCode += self.referenceImplementation.getHeader()

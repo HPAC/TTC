@@ -202,7 +202,7 @@ class implementation:
 
         return code 
 
-    def __printLoopBody(self, loopPerm, indent):
+    def __printLoopBody(self, loopPerm, indent, clean):
         loopIdx = loopPerm[0]
         increment = 1
         if( self.perm[0] != 0 ):
@@ -223,8 +223,21 @@ class implementation:
             self.code +=  "%sfor(int i%d = 0; i%d < size%d; i%d+= %d)\n"%(indent,loopIdx,loopIdx,loopIdx,loopIdx,increment)
 
         if len(loopPerm) > 1: #we have not reached the inner most loop yet => recursion
-            self.__printLoopBody(loopPerm[1:], indent + "   ")
+            self.__printLoopBody(loopPerm[1:], indent + "   ", clean)
         else: #we reached the innermost loop, no recursion
+
+            if( clean ):
+                cleanMacroTransposeName = self.transposeMacroKernelname + "_"
+                for i in self.perm:
+                    cleanMacroTransposeName += str(i)
+          
+                cleanMacroTransposeName +="_"
+                for idx in range(len(self.size)):
+                     cleanMacroTransposeName += "%d"%(self.size[idx])
+                     if(idx != len(self.size)-1):
+                         cleanMacroTransposeName +="x"
+            else:
+                cleanMacroTransposeName = self.transposeMacroKernelname
 
             if( self.prefetchDistance > 0):
                 indexStr = ""
@@ -245,7 +258,8 @@ class implementation:
                 self.code += "%sint offsetBnext0 = task.offsetB;\n"%(indent + self.indent + self.indent)
 
                 self.code += "%sconst Offset &currentTask = tasks.front();\n"%(indent + self.indent + self.indent)
-                self.code += "%s%s(&A[currentTask.offsetA], lda%d, &B[currentTask.offsetB], ldb%d, &A[offsetAnext0], &B[offsetBnext0], &A[offsetA], &B[offsetB]%s);\n"%(indent + self.indent + self.indent, self.transposeMacroKernelname, self.perm[0], self.ldout, self.getBroadcastVariables())
+                
+                self.code += "%s%s(&A[currentTask.offsetA], lda%d, &B[currentTask.offsetB], ldb%d, &A[offsetAnext0], &B[offsetBnext0], &A[offsetA], &B[offsetB]%s);\n"%(indent + self.indent + self.indent, cleanMacroTransposeName, self.perm[0], self.ldout, self.getBroadcastVariables())
                 self.code += "%stasks.pop();\n"%(indent + self.indent + self.indent)
                 self.code += "%s}\n"%(indent + self.indent)
 
@@ -261,9 +275,12 @@ class implementation:
 
             else:
                 if( self.perm[0] != 0):
-                    self.code +=  "%s%s(&A[%s], lda%d, &B[%s], ldb%d%s);\n"%(indent + self.indent, self.transposeMacroKernelname,self.getOffsetA(), self.perm[0], self.getOffsetB(),self.ldout, self.getBroadcastVariables())
+                    self.code +=  "%s%s(&A[%s], lda%d, &B[%s], ldb%d%s);\n"%(indent + self.indent, cleanMacroTransposeName,self.getOffsetA(), self.perm[0], self.getOffsetB(),self.ldout, self.getBroadcastVariables())
                 else:
-                    self.code +=  "%s%s(&A[%s], lda1, lda%d, &B[%s], ldb1, ldb%d%s);\n"%(indent + self.indent, self.transposeMacroKernelname,self.getOffsetA(1), self.perm[1], self.getOffsetB(1),self.ldout, self.getBroadcastVariables())
+                    if( not clean) :
+                        self.code +=  "%s%s(&A[%s], lda1, lda%d, &B[%s], ldb1, ldb%d%s);\n"%(indent + self.indent, cleanMacroTransposeName,self.getOffsetA(1), self.perm[1], self.getOffsetB(1),self.ldout, self.getBroadcastVariables())
+                    else:
+                        self.code +=  "%s%s<size0>(&A[%s], lda1, lda%d, &B[%s], ldb1, ldb%d%s);\n"%(indent + self.indent, cleanMacroTransposeName,self.getOffsetA(1), self.perm[1], self.getOffsetB(1),self.ldout, self.getBroadcastVariables())
 
             if( self.prefetchDistance > 0 ):
                 self.code += "%s}\n"%indent
@@ -388,32 +405,43 @@ class implementation:
         betaFloatType = "float"
         if( self.floatTypeB.find("double") != -1 ):
             betaFloatType = "double"
+        size_str = ""
+        for i in range(self.dim):
+            size_str += "int size%d, "%i
+        size_str = size_str[:-2]
         if(self.beta != 0): 
-            return "void %s( const %s* __restrict__ A, %s* __restrict__ B, const %s alpha, const %s beta, const int *size, const int *lda, const int *ldb)%s"% (transposeName, self.floatTypeA, self.floatTypeB, alphaFloatType,betaFloatType, trailingChar)
+            if( not clean ):
+                return "void %s( const %s* __restrict__ A, %s* __restrict__ B, const %s alpha, const %s beta, const int *size, const int *lda, const int *ldb)%s"% (transposeName, self.floatTypeA, self.floatTypeB, alphaFloatType,betaFloatType, trailingChar)
+            else:
+                return "template<%s> void %s( const %s* __restrict__ A, %s* __restrict__ B, const %s alpha, const %s beta, const int *lda, const int *ldb)%s"% (size_str, transposeName, self.floatTypeA, self.floatTypeB, alphaFloatType,betaFloatType, trailingChar)
         else: 
-            return "void %s( const %s* __restrict__ A, %s* __restrict__ B, const %s alpha, const int *size, const int *lda, const int *ldb)%s"% (transposeName, self.floatTypeA, self.floatTypeB, alphaFloatType, trailingChar)
+            if( not clean ):
+                return "void %s( const %s* __restrict__ A, %s* __restrict__ B, const %s alpha, const int *size, const int *lda, const int *ldb)%s"% (transposeName, self.floatTypeA, self.floatTypeB, alphaFloatType, trailingChar)
+            else:
+                return "template<%s> void %s( const %s* __restrict__ A, %s* __restrict__ B, const %s alpha, const int *lda, const int *ldb)%s"% (size_str, transposeName, self.floatTypeA, self.floatTypeB, alphaFloatType, trailingChar)
 
 
     def printHeader(self, headerFlag = 1, clean = 0):
         self.code +=  self.getHeader(headerFlag, clean)
 
-    def declareVariables(self):
-        for i in range(self.dim):
-            self.code +=  "%sconst int size%d = size[%d];\n"%(self.indent,i,i)
+    def declareVariables(self,clean):
+        if( not clean ):
+            for i in range(self.dim):
+                self.code +=  "%sconst int size%d = size[%d];\n"%(self.indent,i,i)
         for i in range(self.dim):
             self.code +=  "%sconst int lda%d = lda[%d];\n"%(self.indent,i,i)
         for i in range(self.dim):
             self.code +=  "%sconst int ldb%d = ldb[%d];\n"%(self.indent,i,i)
         if( self.perm[0] != 0 ):
             if( self.remainderA != 0):
-                self.code +=   "%sconst int remainder0 = %d;\n"%(self.indent,self.remainderA)
+                self.code +=   "%sconst int remainder0 = size0 %% %d;\n"%(self.indent,self.blockA)
             if( self.remainderB != 0):
-                self.code +=   "%sconst int remainder%d = %d;\n"%(self.indent,self.perm[0], self.remainderB)
+                self.code +=   "%sconst int remainder%d = size%d %% %d;\n"%(self.indent,self.perm[0],self.perm[0], self.blockB)
         else:
             if( self.remainderA != 0):
-                self.code +=   "%sconst int remainder1 = %d;\n"%(self.indent,self.remainderA)
+                self.code +=   "%sconst int remainder1 = size1 %% %d;\n"%(self.indent,self.blockA)
             if( self.remainderB != 0):
-                self.code +=   "%sconst int remainder%d = %d;\n"%(self.indent,self.perm[1], self.remainderB)
+                self.code +=   "%sconst int remainder%d = size%d %% %d;\n"%(self.indent,self.perm[1],self.perm[1], self.blockB)
         if( self.prefetchDistance > 0 and self.debug ):
             self.code +=   "%sint offsetAnext = 0, offsetBnext = 0;\n"%(self.indent)
 
@@ -431,11 +459,8 @@ class implementation:
 
         self.code = ""
 
-        if( clean ):
-            self.printHeader(0,1)
-        else:
-            self.printHeader(0)
-        self.declareVariables()
+        self.printHeader(0,clean)
+        self.declareVariables(clean)
 
         if(self.perm[0] != 0 and self.scalar ==0):  
             self.getBroadcastKernel("reg_alpha","alpha", self.floatTypeA)
@@ -455,7 +480,7 @@ class implementation:
             
             if( parallel ):
                self.code += "#pragma omp for collapse(%d) schedule(static)\n"%(len(self.loopPerm))
-            self.__printLoopBody(self.loopPerm, indent)
+            self.__printLoopBody(self.loopPerm, indent, clean)
 
             if( self.prefetchDistance > 0 ):
                 self.code += indent + "while(tasks.size() > 0){\n"
@@ -464,6 +489,16 @@ class implementation:
                 if( endPos != -1):
                     endPos -= 1 #remove last '_'
                 cleanMacroTransposeName = self.transposeMacroKernelname[:endPos]#remove prefetch
+                if( clean ):
+                    cleanMacroTransposeName += "_"
+                    for i in self.perm:
+                        cleanMacroTransposeName += str(i)
+              
+                    cleanMacroTransposeName +="_"
+                    for idx in range(len(self.size)):
+                         cleanMacroTransposeName += "%d"%(self.size[idx])
+                         if(idx != len(self.size)-1):
+                             cleanMacroTransposeName +="x"
                 self.code += indent + "    %s(&A[task.offsetA], lda%d, &B[task.offsetB], ldb%d %s);\n"%(cleanMacroTransposeName, self.perm[0], self.ldout, self.getBroadcastVariables())
                 self.code += indent + "    tasks.pop();\n"
                 self.code += indent + "}\n"

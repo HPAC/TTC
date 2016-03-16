@@ -106,7 +106,7 @@ def getTransposeName( ttcArgs ):
     return name
 
 def printEpilog(transposeName, beta):
-    print OKGREEN +"[SUCCESS]" + ENDC +" Please find the generated code under ./ttc_transpositions/%s.[h/cpp]\n"%transposeName
+    print OKGREEN +"[SUCCESS]" + ENDC +" Please find the generated code under ./ttc_transpositions/%s.h\n"%transposeName
 
     print "------------------ Usage ------------------"
     print "// 1) include header"
@@ -999,7 +999,7 @@ def generateTransposition( ttcArgs ):
         if( solutionFound == 1):
             fastestVersion = generator.implementations[-1].getVersionName()
         if( emitReference or numSolutions == 1):
-            code = (generator.referenceImplementation.getImplementation(_parallelize), generator.referenceImplementation.getHeader())
+            code = generator.referenceImplementation.getImplementation(_parallelize, 1)
             transposeName = generator.referenceImplementation.getTransposeName()
         else: 
             code = generator.generateVersion(fastestVersion)
@@ -1007,33 +1007,27 @@ def generateTransposition( ttcArgs ):
             directory = workingDir +"/ttc_transpositions"
             if not os.path.exists(directory):
                 os.makedirs(directory)
-            cppFile = directory + "/%s.cpp"%transposeName
 	    if(ttcArgs.compiler == "nvcc"):
 		cppFile = directory + "/%s.cu"%transposeName
+                f = open(cppFile ,'w')
+                cppCode = code
+                f.write(cppCode)
+                f.close()
             hFile = directory + "/%s.h"%transposeName
-            f = open(cppFile ,'w')
-            cppCode = ""
 
             define = transposeName + "_H"
             hppCode = "#ifndef %s\n"%(define.upper())
             hppCode += "#define %s\n"%(define.upper())
             if( ttcArgs.scalar != 1 ):
                 if ttcArgs.architecture == "avx" or ttcArgs.architecture == "knc" or ttcArgs.architecture == "avx512":
-                    cppCode += "#include <xmmintrin.h>\n#include <immintrin.h>\n"
                     hppCode += "#include <xmmintrin.h>\n#include <immintrin.h>\n"
                 elif ttcArgs.architecture == "power":
-                    cppCode += "#include <builtins.h>\n"
                     hppCode += "#include <builtins.h>\n"
-                    cppCode += "#include <altivec.h>\n"
                     hppCode += "#include <altivec.h>\n"
             if ttcArgs.floatTypeA.find("complex") != 1 or ttcArgs.floatTypeB.find("complex") != 1:
-                cppCode += "#include <complex.h>\n"
                 hppCode += "#include <complex.h>\n"
-            cppCode += code[0]
-            f.write(cppCode)
-            f.close()
             f = open(hFile,'w')
-            hppCode += code[1]
+            hppCode += code
             hppCode += "#endif\n"
             f.write(hppCode)
             f.close()
