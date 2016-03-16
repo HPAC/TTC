@@ -165,8 +165,7 @@ class transposeGenerator:
         #generate scalar version as reference
         self.referenceImplementation = transpose.implementation((1,1),
                 perm[-1::-1], self.perm, self.size, self.alpha, self.beta,
-                self.floatTypeA, self.floatTypeB, "",  1, 0,(1,1),1, self.architecture, self.lda,
-                self.ldb, parallelize)
+                self.floatTypeA, self.floatTypeB, "",  1, 0,(1,1),1, self.architecture, parallelize)
 
         if( self.scalar == 1):
             self.microBlocking = [(1,1),"NOT AVAILABLE"]
@@ -323,8 +322,7 @@ class transposeGenerator:
                         implementation = transpose.implementation(blocking, loopPerm,
                                 self.perm, self.size, self.alpha, self.beta, self.floatTypeA, self.floatTypeB,
                                 opt, self.scalar, prefetchDistance, self.microBlocking[0],
-                                0, self.architecture, self.lda, self.ldb,
-                                self.parallelize)
+                                0, self.architecture, self.parallelize)
 
                         if( len(self.implementations) < self.maxNumImplementations ):
                             self.implementations.append(implementation)
@@ -516,24 +514,29 @@ class transposeGenerator:
         code +="   int dim = %d;\n"%self.dim
 
         line = "   int size[] = {"
-        totalSize = 1
         for i in range(self.dim):
             line += str(self.size[i])
             if i != self.dim -1:
                 line += ","
-            totalSize *= self.size[i]
         line += "};\n"
         code +=line
 
         line = "   int lda[] = {"
-        totalSize = 1
         for i in range(self.dim):
             line += str(self.lda[i])
             if i != self.dim -1:
                 line += ","
-            totalSize *= self.lda[i]
         line += "};\n"
         code +=line
+
+        line = "   int ldb[] = {"
+        for i in range(self.dim):
+            line += str(self.ldb[i])
+            if i != self.dim -1:
+                line += ","
+        line += "};\n"
+        code +=line
+
 
         maxSize = max(self.lda[-1] * self.size[-1], self.ldb[-1] * self.size[self.perm[-1]])
         code +="   int total_size = %d;\n"%(maxSize)
@@ -617,9 +620,9 @@ class transposeGenerator:
         code +="   double referenceBandwidth = 0;\n"
         if( self.noTest == 0 ):
             if(self.beta != 0 ):
-                code +="   %s(A_const, B_ref, alpha, beta);\n"%self.referenceImplementation.getTransposeName()
+                code +="   %s(A_const, B_ref, alpha, beta, size, lda, ldb);\n"%self.referenceImplementation.getTransposeName()
             else: 
-                code +="   %s(A_const, B_ref, alpha);\n"%self.referenceImplementation.getTransposeName() 
+                code +="   %s(A_const, B_ref, alpha, size, lda, ldb);\n"%self.referenceImplementation.getTransposeName() 
 
         refVersionStr = self.referenceImplementation.getTransposeName()
         #time reference version
@@ -641,9 +644,9 @@ class transposeGenerator:
             code +="         MPI_Barrier(MPI_COMM_WORLD);\n"
         code +="         start = omp_get_wtime();\n"
         if(self.beta != 0 ):
-            code +="         %s(A_const, B, alpha, beta);\n"%refVersionStr
+            code +="         %s(A_const, B, alpha, beta, size, lda, ldb);\n"%refVersionStr
         else:
-            code +="         %s(A_const, B, alpha);\n"%refVersionStr 
+            code +="         %s(A_const, B, alpha, size, lda, ldb);\n"%refVersionStr 
         if( self.mpi ):
             code +="         MPI_Barrier(MPI_COMM_WORLD);\n"
         code +="         double tmpTime = omp_get_wtime() - start;\n"
@@ -684,7 +687,7 @@ class transposeGenerator:
         #split measurement into several files
         measureHPP = ""
         for i in range(numFiles):
-            code += "   tmpBandwidth = measure%d(nRepeat, argc, argv, A_const, A_copy, B, B_copy_const, B_ref, alpha, beta, total_size, elements_moved, largerThanL3, size, trash1, trash2);\n"%(i)
+            code += "   tmpBandwidth = measure%d(nRepeat, argc, argv, A_const, A_copy, B, B_copy_const, B_ref, alpha, beta, total_size, elements_moved, largerThanL3, size, trash1, trash2, lda, ldb);\n"%(i)
             code += "   maxBandwidth = (tmpBandwidth < maxBandwidth) ? maxBandwidth : tmpBandwidth;\n"
 
             tmpCode = "#include \"util.h\"\n"
@@ -701,7 +704,7 @@ class transposeGenerator:
             A_const, %s * A_copy, %s * B, const %s * B_copy_const, const %s * B_ref, const %s alpha,
             const %s beta, int total_size, int elements_moved,
             int largerThanL3, int *size, double *trash1, double
-            *trash2)"""%(i,self.floatTypeA,self.floatTypeA,self.floatTypeB,self.floatTypeB,self.floatTypeB,alphaFloatType , betaFloatType)
+            *trash2, int* lda, int* ldb)"""%(i,self.floatTypeA,self.floatTypeA,self.floatTypeB,self.floatTypeB,self.floatTypeB,alphaFloatType , betaFloatType)
             if self.papi:
                 tmpCode +=  "extern int PapiEventSet;\n"
             tmpCode +=  header + "{\n"
@@ -742,9 +745,9 @@ class transposeGenerator:
                     tmpCode +="         if (PAPI_start(PapiEventSet) != PAPI_OK)\n"
                     tmpCode +="            printf(\"Error: papi_start\\n\");\n"
                 if(self.beta != 0):
-                    tmpCode +="         %s(A_const, B, alpha, beta);\n"%transposeName
+                    tmpCode +="         %s(A_const, B, alpha, beta, size, lda, ldb);\n"%transposeName
                 else:
-                    tmpCode +="         %s(A_const, B, alpha);\n"%transposeName  
+                    tmpCode +="         %s(A_const, B, alpha, size, lda, ldb);\n"%transposeName  
                 if self.papi:
                     tmpCode +="         if (PAPI_stop(PapiEventSet, values) != PAPI_OK)\n"
                     tmpCode +="            printf(\"Error: papi_stop\\n\");\n"
@@ -1070,7 +1073,10 @@ class transposeGenerator:
         if( prefetchDistance > 0):
             return code +static+"void %s_prefetch_%d(const %s* __restrict__ A, const int lda, %s* __restrict__ B, const int ldb, const %s* __restrict__ Anext0, %s* __restrict__ Bnext0, const %s* __restrict__ Anext1, %s* __restrict__ Bnext1%s)\n{\n"""%(transposeMicroKernelname, prefetchDistance, self.floatTypeA,self.floatTypeB, self.floatTypeA,self.floatTypeB, self.floatTypeA,self.floatTypeB,self.getBroadcastVariables(1))
         else:
-            return code +static+"void %s(const %s* __restrict__ A, const int lda, %s* __restrict__ B, const int ldb%s)\n{\n"%(transposeMicroKernelname, self.floatTypeA, self.floatTypeB,self.getBroadcastVariables(1))
+            if( self.perm[0] != 0):
+                return code +static+"void %s(const %s* __restrict__ A, const int lda, %s* __restrict__ B, const int ldb%s)\n{\n"%(transposeMicroKernelname, self.floatTypeA, self.floatTypeB,self.getBroadcastVariables(1))
+            else:
+                return code +static+"void %s(const %s* __restrict__ A, int lda1, const int lda, %s* __restrict__ B, const int ldb1, const int ldb%s)\n{\n"%(transposeMicroKernelname, self.floatTypeA, self.floatTypeB,self.getBroadcastVariables(1))
 
 
     def getUpdateAndStore(self, streamingStores = 0):
@@ -1282,11 +1288,11 @@ class transposeGenerator:
                         code += indent + "#pragma omp simd\n"
                     code += indent + "for(int i0 = 0; i0 < %d; i0++)\n"%(self.size[0])
                     updateStr = ""
-                    outStr = "B[i0 + ib * %d + ia * ldb]"%self.size[0]
+                    outStr = "B[i0 + ib * ldb1 + ia * ldb]"#%self.ldb[1] #TODO ldb[1] instead of size[0] ?!? BUG?
                     if( len(self.size) == 1):
                         inStr = "A[i0]"
                     else:
-                        inStr = "A[i0 + ia * %d + ib * lda]"%self.lda[1]
+                        inStr = "A[i0 + ia * lda1 + ib * lda]"#%self.lda[1]
                     if( self.beta == 0.0 ):
                         updateStr +=  "%s%s = alpha * %s;\n"%(indent + self.indent, outStr, inStr)
                     else:

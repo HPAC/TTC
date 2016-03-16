@@ -33,7 +33,7 @@ import ttc_util
 class implementation:
     def __init__(self, blocking, loopPerm, perm, size, alpha, beta, floatTypeA, floatTypeB,
             optimization, scalar, prefetchDistance, microBlocking, reference,
-            architecture, lda, ldb, parallelize):
+            architecture, parallelize):
 
         self.parallelize = parallelize
         self.debug = 0 
@@ -83,10 +83,6 @@ class implementation:
 
         self.code = ""
 
-        #compute leading dimensions
-        self.lda = copy.deepcopy(lda)
-        self.ldb = copy.deepcopy(ldb)
-
         self.ldout = -1
         for i in range(len(self.perm)):
             if( self.perm[0] != 0 ):
@@ -115,7 +111,7 @@ class implementation:
         offset = ""
         for i in range(start,self.dim):
             offset += "i" + str(i)
-            if(self.lda[i] != 1):
+            if(i != 0):
                 offset += "*lda" + str(i)
             if( i != self.dim-1):
                 offset += " + "
@@ -130,7 +126,7 @@ class implementation:
                 if self.perm[j] == i:
                     invIdx = j
             offset += "i" + str(i)
-            if(self.ldb[invIdx] != 1):
+            if(invIdx != 0):
                 offset += "*ldb" + str(invIdx)
             if( i != self.dim-1):
                 offset += " + "
@@ -267,7 +263,7 @@ class implementation:
                 if( self.perm[0] != 0):
                     self.code +=  "%s%s(&A[%s], lda%d, &B[%s], ldb%d%s);\n"%(indent + self.indent, self.transposeMacroKernelname,self.getOffsetA(), self.perm[0], self.getOffsetB(),self.ldout, self.getBroadcastVariables())
                 else:
-                    self.code +=  "%s%s(&A[%s], lda%d, &B[%s], ldb%d%s);\n"%(indent + self.indent, self.transposeMacroKernelname,self.getOffsetA(1), self.perm[1], self.getOffsetB(1),self.ldout, self.getBroadcastVariables())
+                    self.code +=  "%s%s(&A[%s], lda1, lda%d, &B[%s], ldb1, ldb%d%s);\n"%(indent + self.indent, self.transposeMacroKernelname,self.getOffsetA(1), self.perm[1], self.getOffsetB(1),self.ldout, self.getBroadcastVariables())
 
             if( self.prefetchDistance > 0 ):
                 self.code += "%s}\n"%indent
@@ -329,17 +325,17 @@ class implementation:
              if(idx != len(self.size)-1):
 		 transposeName +="x"
 
-        transposeName +="_"
-        for idx in range(len(self.lda)):
-             transposeName += "%d"%(self.lda[idx])
-             if(idx != len(self.lda)-1):
-		 transposeName +="x"
-
-	transposeName +="_"
-        for idx in range(len(self.ldb)):
-             transposeName += "%d"%(self.ldb[idx])
-             if(idx != len(self.ldb)-1):
-		 transposeName +="x"
+#        transposeName +="_"
+#        for idx in range(len(self.lda)):
+#             transposeName += "%d"%(self.lda[idx])
+#             if(idx != len(self.lda)-1):
+#		 transposeName +="x"
+#
+#	transposeName +="_"
+#        for idx in range(len(self.ldb)):
+#             transposeName += "%d"%(self.ldb[idx])
+#             if(idx != len(self.ldb)-1):
+#		 transposeName +="x"
 
         if(clean == 0):
             transposeName += "_"
@@ -393,9 +389,9 @@ class implementation:
         if( self.floatTypeB.find("double") != -1 ):
             betaFloatType = "double"
         if(self.beta != 0): 
-            return "void %s( const %s* __restrict__ A, %s* __restrict__ B, const %s alpha, const %s beta)%s"% (transposeName, self.floatTypeA, self.floatTypeB, alphaFloatType,betaFloatType, trailingChar)
+            return "void %s( const %s* __restrict__ A, %s* __restrict__ B, const %s alpha, const %s beta, const int *size, const int *lda, const int *ldb)%s"% (transposeName, self.floatTypeA, self.floatTypeB, alphaFloatType,betaFloatType, trailingChar)
         else: 
-            return "void %s( const %s* __restrict__ A, %s* __restrict__ B, const %s alpha)%s"% (transposeName, self.floatTypeA, self.floatTypeB, alphaFloatType, trailingChar)
+            return "void %s( const %s* __restrict__ A, %s* __restrict__ B, const %s alpha, const int *size, const int *lda, const int *ldb)%s"% (transposeName, self.floatTypeA, self.floatTypeB, alphaFloatType, trailingChar)
 
 
     def printHeader(self, headerFlag = 1, clean = 0):
@@ -403,11 +399,11 @@ class implementation:
 
     def declareVariables(self):
         for i in range(self.dim):
-            self.code +=  "%sconst int size%d = %d;\n"%(self.indent,i,self.size[i])
-        for i in range(len(self.lda)):
-            self.code +=  "%sconst int lda%d = %d;\n"%(self.indent,i,self.lda[i])
-        for i in range(len(self.ldb)):
-            self.code +=  "%sconst int ldb%d = %d;\n"%(self.indent,i,self.ldb[i])
+            self.code +=  "%sconst int size%d = size[%d];\n"%(self.indent,i,i)
+        for i in range(self.dim):
+            self.code +=  "%sconst int lda%d = lda[%d];\n"%(self.indent,i,i)
+        for i in range(self.dim):
+            self.code +=  "%sconst int ldb%d = ldb[%d];\n"%(self.indent,i,i)
         if( self.perm[0] != 0 ):
             if( self.remainderA != 0):
                 self.code +=   "%sconst int remainder0 = %d;\n"%(self.indent,self.remainderA)

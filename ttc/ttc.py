@@ -45,8 +45,6 @@ def getTransposeName( ttcArgs ):
     floatTypeB = ttcArgs.floatTypeB
     perm  = ttcArgs.idxPerm
     size  = ttcArgs.size
-    lda = ttcArgs.lda
-    ldb = ttcArgs.ldb
     alpha = ttcArgs.alpha 
     beta = ttcArgs.beta
     numThreads = ttcArgs.numThreads
@@ -87,17 +85,17 @@ def getTransposeName( ttcArgs ):
         if(idx != len(size)-1):
             name +="x"
 
-    name +="_"
-    for idx in range(len(lda)):
-        name += "%d"%(lda[idx])
-        if(idx != len(lda)-1):
-            name +="x"
-
-    name +="_"
-    for idx in range(len(ldb)):
-        name += "%d"%(ldb[idx])
-        if(idx != len(ldb)-1):
-            name +="x"
+#    name +="_"
+#    for idx in range(len(lda)):
+#        name += "%d"%(lda[idx])
+#        if(idx != len(lda)-1):
+#            name +="x"
+#
+#    name +="_"
+#    for idx in range(len(ldb)):
+#        name += "%d"%(ldb[idx])
+#        if(idx != len(ldb)-1):
+#            name +="x"
 
     if( compiler != "nvcc" and numThreads > 1):
         name += "_par"
