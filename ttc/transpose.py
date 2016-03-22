@@ -59,20 +59,6 @@ class implementation:
             self.blockA= 1 #blocking in stride-1 indices of A 
             self.blockB= 1 #blocking in stride-1 indices of B
 
-        #deal with remainder
-        self.remainderA = 0
-        self.remainderB = 0
-        if( perm[0] != 0):
-            self.remainderA = size[0] % self.blockA
-            self.remainderB = size[perm[0]] % self.blockB
-        else:
-            if( len(self.size) == 1):
-                self.remainderA = 0
-                self.remainderB = 0
-            else:
-                self.remainderA = size[1] % self.blockA
-                self.remainderB = size[perm[1]] % self.blockB
-
         self.dim = len(perm)
 
         self.perm = copy.deepcopy(perm)
@@ -171,7 +157,7 @@ class implementation:
             firstIdx = 0
             if( self.perm[0] == 0 ):
                 firstIdx = 1
-            if( remainderIdx == firstIdx and self.remainderB != 0 and loopIdx == self.perm[firstIdx]):
+            if( remainderIdx == firstIdx and loopIdx == self.perm[firstIdx]):
                 self.code +=  "%sfor(int i%d = 0; i%d < size%d - remainder%d; i%d += %d)\n"%(indent,loopIdx,loopIdx,loopIdx,loopIdx,loopIdx,increment)
             else:
                 self.code +=  "%sfor(int i%d = 0; i%d < size%d; i%d += %d)\n"%(indent,loopIdx,loopIdx,loopIdx,loopIdx,increment)
@@ -433,15 +419,11 @@ class implementation:
         for i in range(self.dim):
             self.code +=  "%sconst int ldb%d = ldb[%d];\n"%(self.indent,i,i)
         if( self.perm[0] != 0 ):
-            if( self.remainderA != 0):
-                self.code +=   "%sconst int remainder0 = size0 %% %d;\n"%(self.indent,self.blockA)
-            if( self.remainderB != 0):
-                self.code +=   "%sconst int remainder%d = size%d %% %d;\n"%(self.indent,self.perm[0],self.perm[0], self.blockB)
+            self.code +=   "%sconst int remainder0 = size0 %% %d;\n"%(self.indent,self.blockA)
+            self.code +=   "%sconst int remainder%d = size%d %% %d;\n"%(self.indent,self.perm[0],self.perm[0], self.blockB)
         else:
-            if( self.remainderA != 0):
-                self.code +=   "%sconst int remainder1 = size1 %% %d;\n"%(self.indent,self.blockA)
-            if( self.remainderB != 0):
-                self.code +=   "%sconst int remainder%d = size%d %% %d;\n"%(self.indent,self.perm[1],self.perm[1], self.blockB)
+            self.code +=   "%sconst int remainder1 = size1 %% %d;\n"%(self.indent,self.blockA)
+            self.code +=   "%sconst int remainder%d = size%d %% %d;\n"%(self.indent,self.perm[1],self.perm[1], self.blockB)
         if( self.prefetchDistance > 0 and self.debug ):
             self.code +=   "%sint offsetAnext = 0, offsetBnext = 0;\n"%(self.indent)
 
@@ -507,29 +489,25 @@ class implementation:
             if( parallel ):
                 indent += self.indent
             if( self.perm[0] != 0 ):
-                if( self.remainderA != 0 and self.size[self.perm[0]] - self.remainderB > 0):
-                    if( parallel ):
-                        self.code += "#pragma omp for collapse(%d) schedule(static)\n"%(self.dim)
-                    self.code += indent + "//Remainder loop" + "\n"
-                    self.printRemainderLoop(self.loopPerm, indent, 0)
+                if( parallel ):
+                    self.code += "#pragma omp for collapse(%d) schedule(static)\n"%(self.dim)
+                self.code += indent + "//Remainder loop" + "\n"
+                self.printRemainderLoop(self.loopPerm, indent, 0)
 
-                if( self.remainderB != 0 ):
-                    if( parallel ):
-                        self.code += "#pragma omp for collapse(%d) schedule(static)\n"%(self.dim)
-                    self.code += indent + "//Remainder loop" + "\n"
-                    self.printRemainderLoop(self.loopPerm, indent, self.perm[0])
+                if( parallel ):
+                    self.code += "#pragma omp for collapse(%d) schedule(static)\n"%(self.dim)
+                self.code += indent + "//Remainder loop" + "\n"
+                self.printRemainderLoop(self.loopPerm, indent, self.perm[0])
             else:
-                if( self.remainderA != 0 and self.size[self.perm[1]] - self.remainderB > 0):
-                    if( parallel ):
-                        self.code += "#pragma omp for collapse(%d) schedule(static)\n"%(self.dim-1)
-                    self.code += indent + "//Remainder loop" + "\n"
-                    self.printRemainderLoop(self.loopPerm, indent, 1)
+                if( parallel ):
+                    self.code += "#pragma omp for collapse(%d) schedule(static)\n"%(self.dim-1)
+                self.code += indent + "//Remainder loop" + "\n"
+                self.printRemainderLoop(self.loopPerm, indent, 1)
 
-                if( self.remainderB != 0 ):
-                    if( parallel ):
-                        self.code += "#pragma omp for collapse(%d) schedule(static)\n"%(self.dim-1)
-                    self.code += indent + "//Remainder loop" + "\n"
-                    self.printRemainderLoop(self.loopPerm, indent, self.perm[1])
+                if( parallel ):
+                    self.code += "#pragma omp for collapse(%d) schedule(static)\n"%(self.dim-1)
+                self.code += indent + "//Remainder loop" + "\n"
+                self.printRemainderLoop(self.loopPerm, indent, self.perm[1])
 
             if( parallel ):
                 self.code += self.indent +"}\n"
