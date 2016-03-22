@@ -227,24 +227,22 @@ class GPUtransposeGenerator:
     def getNumSolutions(self):
         return len(self.implementations)
 
-    def generate(self, versionStr = "", attainedBW = 0.0):
-        if( versionStr == "" ):
-            self.getSolutions()
-            self.printMain()
-            self.generateImplementations()
-        else:
-            #used to generate a specific implementation
-            for impl in self.implementations:
-                if( impl.getVersionName() == versionStr ): 
-                    return (self.getFastestVersion(impl,attainedBW), impl.getCudaTransposeHeader(0) + ";\n")
-            return ""  
+    def generateVersion(self,versionStr):
+        for impl in self.implementations:
+            if( impl.getVersionName() == versionStr ): 
+                return (self.getFastestVersion(impl), impl.getCudaTransposeHeader(0) + ";\n")
+        return ""
+
+    def generate(self):
+        self.getSolutions()
+        self.printMain()
+        self.generateImplementations()
 
 
-    def getFastestVersion(self,implementation , attainedBW):
+    def getFastestVersion(self,implementation ):
 	code = "#include <cuda_runtime.h>\n"
 	code = "#include <cuComplex.h>\n"
         code = "#include <complex.h>\n\n"
-	code +="//Attained BW = %d\n\n"%(attainedBW)
 	code += implementation.getHostCall()
 	code += implementation.getCudaImplementation()
 	if(self.perm[0] !=0):

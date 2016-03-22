@@ -1003,11 +1003,12 @@ def generateTransposition( ttcArgs ):
             directory = workingDir +"/ttc_transpositions"
             if not os.path.exists(directory):
                 os.makedirs(directory)
-            generator.generateOffsetFile(directory)
-	    if(ttcArgs.compiler == "nvcc"):
+            if ttcArgs.architecture == "avx" or ttcArgs.architecture == "knc" or ttcArgs.architecture == "avx512":
+                generator.generateOffsetFile(directory)
+	    elif(ttcArgs.architecture == "cuda"):
 		cppFile = directory + "/%s.cu"%transposeName
                 f = open(cppFile ,'w')
-                cppCode = code
+                cppCode = code[0]
                 f.write(cppCode)
                 f.close()
             hFile = directory + "/%s.h"%transposeName
@@ -1024,7 +1025,10 @@ def generateTransposition( ttcArgs ):
             if ttcArgs.floatTypeA.find("complex") != 1 or ttcArgs.floatTypeB.find("complex") != 1:
                 hppCode += "#include <complex.h>\n"
             f = open(hFile,'w')
-            hppCode += code
+            if ttcArgs.architecture == "avx" or ttcArgs.architecture == "knc" or ttcArgs.architecture == "avx512":
+                hppCode += code
+	    elif(ttcArgs.architecture == "cuda"):
+                hppCode += code[1]
             hppCode += "#endif\n"
             f.write(hppCode)
             f.close()

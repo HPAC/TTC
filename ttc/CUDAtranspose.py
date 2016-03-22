@@ -89,10 +89,13 @@ class cuda_transpose:
                    break;
        
        self.indent = "   "
-       self.tiling = [32,32]
+       self.tiling = [32,32] #TODO this should be a function of the precision
        self.cost = 0
+
+       if(self.vectorLength % self.tiling[0] != 0 ):
+           print "[TTC] ERROR: vectorLength is not divisible by %d."%self.tiling[0]
+           exit(-1)
 	 
-	
 
 
     def getCudaImplementation(self):
