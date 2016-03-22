@@ -164,7 +164,6 @@ def printHelp():
     print "   --hotB".ljust(60),"Specifying this flag will keep the input tensor B in cache while measuring (this will not have any effect if B does not fit into the cache)."
     print "   --help".ljust(60),"prints this help"
     print "   --vecLength=<value>".ljust(60),"CUDA Vector length for GPU"
-    print "   --hostname=<host>".ljust(60),"Specify the host name of the Xeon Phi card that you want to run the transposition on (e.g., localhost-mic0). This argument is only required for runs on a Xeon Phi."
     print """   --architecture=
     avx, power, avx512, knc, cuda 
     
@@ -645,11 +644,8 @@ def generateTransposition( ttcArgs ):
     if( (ttcArgs.architecture == "knc" or ttcArgs.architecture == "avx512" or ttcArgs.architecture == "power") and ttcArgs.floatTypeA != "float"):
         print FAIL + "[TTC] ERROR: the selected architecture doesn't support the selected precision yet." + ENDC
         exit(-1)
-    if( (ttcArgs.architecture == "knc") and ttcArgs.hostName == "" ):
-        print FAIL + "[TTC] ERROR: you are using the KNC or KNL please specify the hostname of the target card (e.g., --hostname=cluster-phi-mic0)" + ENDC
-        exit(-1)
-    if( (ttcArgs.architecture == "avx512") and ttcArgs.hostName == "" ):
-        print WARNING + "[TTC] WARNING: you are trying to generate code for an avx512-enabled processor. This could be either the host or a KNL coprocessor. In the latter case you have to specify the hostname of the target card via --hostname=<card name>." + ENDC
+    if( (ttcArgs.architecture == "avx512") ):
+        print WARNING + "[TTC] WARNING: you are trying to generate code for an avx512-enabled processor. This could be either the host or a KNL coprocessor. " + ENDC
 
     if ttcArgs.maxNumImplementations == -1:
         ttcArgs.maxNumImplementations = 10000000
@@ -903,7 +899,7 @@ def generateTransposition( ttcArgs ):
                     proc = subprocess.Popen(["mpirun", "-n","%d"%_numSockets, "-env", "I_MPI_PIN", "1", "-env", "KMP_AFFINITY=verbose,compact", "-env", "OMP_NUM_THREADS=%d"%(ttcArgs.numThreads/_numSockets), "-env","I_MPI_PIN_DOMAIN=socket", "-env","I_MPI_PIN_CELL=core","./transpose.exe"],stderr=subprocess.STDOUT,stdout=subprocess.PIPE, env=my_env)
                 else:
                     if( ttcArgs.architecture == "knc" or ttcArgs.architecture == "avx512"):
-                        proc = subprocess.Popen(["ssh",_hostName,"source /etc/profile; KMP_AFFINITY=%s OMP_NUM_THREADS=%d  %s/transpose.exe"%(ttcArgs.affinity,ttcArgs.numThreads,_ttc_root)],stderr=subprocess.STDOUT,stdout=subprocess.PIPE, env=my_env, stdin=subprocess.PIPE)
+                        proc = subprocess.Popen(["ssh_mic","source /etc/profile; KMP_AFFINITY=%s OMP_NUM_THREADS=%d  %s/transpose.exe"%(ttcArgs.affinity,ttcArgs.numThreads,_ttc_root)],stderr=subprocess.STDOUT,stdout=subprocess.PIPE, env=my_env, stdin=subprocess.PIPE)
                     else:
                         proc = subprocess.Popen(['./transpose.exe'],stderr=subprocess.STDOUT,stdout=subprocess.PIPE, env=my_env)
                 counter = 0
@@ -1098,7 +1094,7 @@ def main():
             "--numThreads", "--generateOnly","--prefetchDistances",
             "--updateDatabase","--dontCompile","-v", "--blockings",
             "--noTest","--no-align","--no-vec","--mpi", "--architecture",
-            "--affinity","--lda", "--ldb", "--ignoreDatabase", "--hostname","--vecLength", "--hotA", "--hotB"]
+            "--affinity","--lda", "--ldb", "--ignoreDatabase", "--vecLength", "--hotA", "--hotB"]
 
     _hotA = 0
     _hotB = 0
@@ -1131,7 +1127,6 @@ def main():
     _noTest = 0
     _loopPermutations = []
     _align = 1
-    _hostName = ""
     _vecLength = []
 
 
@@ -1177,8 +1172,6 @@ def main():
             _hotB = 1
         if arg == "--papi":
             _papi = 1
-        if arg.find("--hostname=") != -1:
-            _hostName = arg.split("=")[1] 
         if arg.find("--architecture=") != -1:
             if( arg.split("=")[1] == "avx" ):
                 _architecture = "avx"
@@ -1321,7 +1314,6 @@ def main():
     ttc_args.prefetchDistances = _prefetchDistances
     ttc_args.scalar = _scalar
     ttc_args.compiler  = _compiler 
-    ttc_args.hostName  = _hostName 
     ttc_args.vecLength = _vecLength
     ttc_args.silent = 0
     ttc_args.hotA = _hotA
