@@ -905,9 +905,9 @@ class cuda_transpose:
 
 
 
-    def getCostLoop(self):
-        self.cost = ttc_util.getCostLoop(self.loopPerm, self.perm, self.size)
-        return self.cost
+    #def getCostLoop(self):
+    #    self.cost = ttc_util.getCostLoop(self.loopPerm, self.perm, self.size)
+    #    return self.cost
 
 
 

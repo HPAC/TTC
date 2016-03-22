@@ -824,7 +824,7 @@ def generateTransposition( ttcArgs ):
 
     if(ttcArgs.compiler == "nvcc"):
         generator = gputg.GPUtransposeGenerator(ttcArgs.idxPerm, ttcArgs.loopPermutations, ttcArgs.size, ttcArgs.alpha, ttcArgs.beta,
-                ttcArgs.maxNumImplementations, ttcArgs.floatTypeA, ttcArgs.floatTypeB, _parallelize, ttcArgs.blockings, _papi, _noTest ,ttcArgs.vecLength , ttcArgs.lda, ttcArgs.ldb)
+                ttcArgs.maxNumImplementations, ttcArgs.floatTypeA, ttcArgs.floatTypeB, ttcArgs.blockings, _noTest ,ttcArgs.vecLength , ttcArgs.lda, ttcArgs.ldb)
     else:		
         generator = tg.transposeGenerator(ttcArgs.idxPerm, ttcArgs.loopPermutations, ttcArgs.size, ttcArgs.alpha, ttcArgs.beta,
                 ttcArgs.maxNumImplementations, ttcArgs.floatTypeA, ttcArgs.floatTypeB, _parallelize, ttcArgs.streamingStores,

@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import ttc_util
+import math
 import itertools
 import os
 import copy
@@ -38,12 +40,11 @@ ENDC = '\033[0m'
 
 class GPUtransposeGenerator:
     def __init__(self, perm, loopPermutations, size, alpha, beta, maxNumImplementations,
-            floatTypeA, floatTypeB, parallelize, blockings, papi, noTest, vectorLength, lda,ldb):
+            floatTypeA, floatTypeB, blockings, noTest, vectorLength, lda,ldb):
 
-	#Depricated variables : papi, parallelize, maxNumImplementation
-       
         self.floatTypeA = floatTypeA
         self.floatTypeB = floatTypeB
+        self.cacheLineSize = 128 #in bytes
 
         if(floatTypeA != floatTypeB):
             print "ERROR: mixed precision has not been implemented for cuda yet."
@@ -51,18 +52,18 @@ class GPUtransposeGenerator:
        
         self.alpha = alpha
         self.beta = beta
-        self.precission = 1e-5 # used in the function "equal" in util.cu
+        self.precision = 1e-5 # used in the function "equal" in util.cu
         self.alphaFloatType = "float"
         if( self.floatTypeA.find("double") != -1 ):
             self.alphaFloatType = "double"
-	    self.precission = 1e-10
+	    self.precision = 1e-10
 
         if(self.floatTypeA == "float complex"):
              self.floatTypeA = "cuFloatComplex"
         if(self.floatTypeA == "double complex"):
              self.floatTypeA = "cuDoubleComplex"
              self.alphaFloatType = "double"
-	     self.precission = 1e-10
+	     self.precision = 1e-10
      
        
         self.size = copy.deepcopy(size)
@@ -71,8 +72,6 @@ class GPUtransposeGenerator:
         self.perm = copy.deepcopy(perm)
         self.indent = "   "
         self.noTest = noTest
-	self.papi = 0
-        self.parallelize = parallelize
         self.lda = copy.deepcopy(lda)
         self.ldb = copy.deepcopy(ldb)
 
@@ -86,7 +85,7 @@ class GPUtransposeGenerator:
 	if(count == t):
 	    self.matCopy = 1
       
-        self.floatSize = self.__getFloatTypeSize()
+        self.floatSizeA = self.__getFloatTypeSize()
         
         if(len(vectorLength) == 0):
             self.vectorLength = [128,256,512]
@@ -159,6 +158,18 @@ class GPUtransposeGenerator:
                     print WARNING + "No Special blockings for Matrix copy" + ENDC
                     self.blockings.append([32,32])  	    		
 
+        #sort blockings according to cost
+        tmpBlockings = []
+        for blocking in self.blockings:
+            tmpBlockings.append((blocking, self.getCostBlocking(blocking)))
+        
+        tmpBlockings.sort(key=lambda tup: tup[1])
+        tmpBlockings.reverse()
+
+        self.blockings = []
+        for (blocking, cost) in tmpBlockings:
+            self.blockings.append(blocking)
+
 
         self.implementations = []
         self.maxNumImplementations = maxNumImplementations
@@ -191,6 +202,49 @@ class GPUtransposeGenerator:
                 self.loopPermutations.append(loopPerm)
         else:
             self.loopPermutations = copy.deepcopy(loopPermutations)
+
+        # sort loopPermutations
+        self.loopPermutations.sort(key=lambda tup: ttc_util.getCostLoop(tup, self.perm, self.size))
+
+        ######################################
+        # Reduce search space
+        ######################################
+
+        # combine the best sqrt(maxNumImplementations) blockings with the best sqrt() loopOrders
+        # only keep the best sqrt(maxNumImplementations) blockings
+        maxBlockings = math.ceil(math.sqrt(float(maxNumImplementations)))
+        while( len(self.blockings) > maxBlockings 
+                and len(self.blockings) * len(self.loopPermutations) > maxNumImplementations):
+            self.blockings.pop()
+
+        maxLoopPermutations= maxBlockings
+        while( len(self.loopPermutations) > maxLoopPermutations
+                and len(self.blockings) * len(self.loopPermutations) > maxNumImplementations):
+            self.loopPermutations.pop()
+
+
+    def getCostBlocking(self, blocking):
+       if( len(self.size) == 1):
+           return 1 #we don't have any blockings in this case
+       #remainder should be zero
+       size0 = self.size[0]
+       sizep0 = self.size[self.perm[0]]
+       if(self.perm[0] == 0):
+           size0 = self.size[1]
+           sizep0 = self.size[self.perm[1]]
+       remainderA = (size0 % blocking[0]) / float(size0) #should be (close to) zero
+       remainderB = (sizep0 % blocking[1]) / float(sizep0) #should be (close to) zero
+
+       #blocking should be multiple of cacheline
+       numElementsPerCacheLine = self.cacheLineSize / self.floatSizeA
+       numCacheLines = (blocking[0] + numElementsPerCacheLine - 1) / numElementsPerCacheLine
+       cacheLineUtilizationA = blocking[0] / float(numCacheLines * numElementsPerCacheLine) #should be (close to) one
+       numCacheLines = (blocking[1] + numElementsPerCacheLine - 1) / numElementsPerCacheLine
+       cacheLineUtilizationB = blocking[1] / float(numCacheLines * numElementsPerCacheLine) #should be (close to) one
+
+       metric = (cacheLineUtilizationA + cacheLineUtilizationB)/2.0  #should be close to 1
+       metric += ((1 - remainderA) + (1- remainderB))/2.0
+       return metric /2.0
 
 
 
@@ -278,7 +332,14 @@ class GPUtransposeGenerator:
                    sys.stdout.write("Implementations generated so far: %d\r"%counter)
                    sys.stdout.flush()
                    implementation = CUDAtranspose.cuda_transpose(self.size,self.perm,loopPerm, self.floatTypeA,blocking,vectorLength,self.beta,self.lda,self.ldb)
-                   self.implementations.append(implementation)
+
+                   if( len(self.implementations) < self.maxNumImplementations ):
+                       self.implementations.append(implementation)
+                       self.implementations.sort(key=lambda tup: ttc_util.getCostLoop(tup.loopPerm, self.perm, self.size) )
+                   else:
+                       self.implementations.append(implementation)
+                       self.implementations.sort(key=lambda tup: ttc_util.getCostLoop(tup.loopPerm, self.perm, self.size) )
+                       self.implementations.pop()
 
         return len(self.implementations)
 
@@ -296,8 +357,6 @@ class GPUtransposeGenerator:
         code +="#include <xmmintrin.h>\n"
         code +="#include <cuComplex.h>\n"
         code += "#include <complex.h>\n\n"
-        if self.papi:
-            code +="#include <papi.h>\n"
         code +="\n"
 
         hppCode ="#include <complex.h>\n"
@@ -307,8 +366,6 @@ class GPUtransposeGenerator:
         hppCode +="#include <omp.h>\n"
         hppCode +="#include <stdlib.h>\n"
         hppCode +="#include <string>\n"
-        if self.papi:
-            hppCode +="#include <papi.h>\n"
         hppCode +="\n"
         hppCode += "void printMatrix2Dcomplex(const %s *A, int *size);\n"%(self.floatTypeA)
         code +="void printMatrix2Dcomplex(const %s *A, int *size)"%(self.floatTypeA)
@@ -356,7 +413,7 @@ class GPUtransposeGenerator:
         code +="      diff = (diff < 0) ? -diff : diff;\n"
         code +="      if(diff > 0){\n"
         code +="          %s relError = (diff/max);\n"%(_floatType)
-        code +="          if(relError > %e){\n"%self.precission  
+        code +="          if(relError > %e){\n"%self.precision  
         code +="              //printf(\"i: %d relError: %.8e %e %e\",i,relError,Atmp[i], Btmp[i]);\n"
         code +="              //exit(0);\n"
         code +="              error += 1;\n"
@@ -396,33 +453,8 @@ class GPUtransposeGenerator:
         self.generateUtil()
 
         code +="\n"
-        if self.papi:
-            code +="int PapiEventSet;\n"
         code +="int main(int argc, char** argv)\n"
         code +="{\n"
-        if self.papi:
-           code +="   int retval;\n"
-           code +="   PapiEventSet = PAPI_NULL;\n"
-
-           code +="   /* Initialize the PAPI library */\n"
-           code +="   retval = PAPI_library_init(PAPI_VER_CURRENT);\n"
-
-           code +="   if (retval != PAPI_VER_CURRENT) {\n"
-           code +="      fprintf(stderr, \"PAPI library init error!\\n\");\n"
-           code +="      exit(1);\n"
-           code +="   }\n"
-
-           code +="   /* Create the Event Set */\n"
-           code +="   if (PAPI_create_eventset(&PapiEventSet) != PAPI_OK)\n"
-           code +="      fprintf(stderr,\"Error: Papi event not available.\\n\");\n"
-
-           code +="   if (PAPI_add_event(PapiEventSet, PAPI_TLB_DM) != PAPI_OK)\n"
-           code +="      fprintf(stderr,\"Error: Papi event not available\\n\");\n"
-           code +="   if (PAPI_add_event(PapiEventSet, PAPI_L2_DCM) != PAPI_OK)\n"
-           code +="      fprintf(stderr,\"Error: Papi event not available\\n\");\n"
-           #code +="   if (PAPI_add_event(PapiEventSet, PAPI_CA_INV) != PAPI_OK)\n"
-           #code +="      fprintf(stderr,\"Error: Papi invalidate event not available\\n\");\n"
-
 
         code +="   srand(time(NULL));\n"
         code +="\n"
