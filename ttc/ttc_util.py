@@ -36,6 +36,14 @@ class TTCargs:
         self.hotB = 0
         self.updateDatabase = 1
 
+    def getSize(self):
+        return copy.deepcopy(self.size)
+
+    def getPerm(self):
+        return copy.deepcopy(self.idxPerm)
+
+
+    
 def listToString(l):
     out = ""
     if(len(l) > 0):

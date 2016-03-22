@@ -244,6 +244,20 @@ class transposeGenerator:
     def getNumSolutions(self):
         return len(self.implementations)
 
+    def generateOffsetFile(self, directory):
+        codeOffset = "#ifndef _TTC_OFFSET_H\n"
+        codeOffset += "#define _TTC_OFFSET_H\n"
+        codeOffset += "struct Offset\n{\n"
+        codeOffset += "   int offsetA;\n"
+        codeOffset += "   int offsetB;\n"
+        codeOffset += "};\n\n"
+        codeOffset += "#endif\n"
+        if(directory[-1] != '/'):
+           directory += '/'
+        offsetFile = open(directory + "ttc_offset.h","w")
+        offsetFile.write(codeOffset)
+        offsetFile.close()
+
     def generateVersion(self,versionStr):
         #used to generate a specific implementation
         for impl in self.implementations:
@@ -256,10 +270,8 @@ class transposeGenerator:
                 code += "#endif\n\n"
                 if(len(prefetchDistances)>1):
                     code += "#include <queue>\n"
-                    code += "struct Offset\n{\n"
-                    code += "   int offsetA;\n"
-                    code += "   int offsetB;\n"
-                    code += "};\n\n"
+                    code += "#include \"ttc_offset.h\"\n"
+                    
                 code += self.generateTranspositionKernel([impl.getBlocking()],prefetchDistances, 1, [impl.optimization])[0]
                 return code + impl.getImplementation(self.parallelize, clean=1 )
         return ""
@@ -1420,6 +1432,7 @@ class transposeGenerator:
         f.write(cppCode)
         f.close()
 
+        self.generateOffsetFile(self.tmpDirectory)
         implementationCounter = 1 #include reference implementation
         for i in range(numFiles):
             cppCode = ""
@@ -1428,10 +1441,7 @@ class transposeGenerator:
             cppCode += "#include <omp.h>\n"
             cppCode += "#include <complex.h>\n"
             cppCode += "#include \"transpose.h\"\n"
-            cppCode += "struct Offset{\n"
-            cppCode += "   int offsetA;\n"
-            cppCode += "   int offsetB;\n"
-            cppCode += "};\n\n"
+            cppCode += "#include \"ttc_offset.h\"\n"
 
             if( i == 0):
                 cppCode += self.getTrashCache()
