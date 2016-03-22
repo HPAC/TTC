@@ -141,7 +141,7 @@ def printHelp():
     print "   --maxImplementations=<value>".ljust(60),"limit the number of implementations"
     print "   ".ljust(14),"-> Default: 500; -1 denotes 'no limit'" 
     print "   --alpha=<value>".ljust(60),"alpha value (default: 1.0)"
-    print "   --beta=<value>".ljust(60),"value (default: 0.0)"
+    print "   --beta=<value>".ljust(60),"beta value (default: 0.0)"
     print "   --compiler=[gcc,intel,ibm,nvcc]".ljust(60),"choose compiler (default: intel)"
     print "   --numThreads=<value>".ljust(60),"number of threads to launch"
     print "   --affinity=<text>".ljust(60),"thread affinity (default: 'granularity=fine,compact,1,0')"
@@ -640,10 +640,10 @@ def generateTransposition( ttcArgs ):
     compiler_version = ttc_util.getCompilerVersion(ttcArgs.compiler)
 
     if( ttcArgs.architecture != "avx" and ttcArgs.floatTypeA != ttcArgs.floatTypeB):
-        print FAIL + "[TTC] ERROR: Mixed precision is currently only supported for avx-enabled processors."
+        print FAIL + "[TTC] ERROR: Mixed precision is currently only supported for avx-enabled processors." + ENDC
         exit(-1)
-    if( (ttcArgs.architecture == "knc" or ttcArgs.architecture == "avx512" or ttcArgs.architecture == "power") and ttc.floatTypeA != "float"):
-        print FAIL + "[TTC] ERROR: the selected architecture doesn't support the selected precision yet."
+    if( (ttcArgs.architecture == "knc" or ttcArgs.architecture == "avx512" or ttcArgs.architecture == "power") and ttcArgs.floatTypeA != "float"):
+        print FAIL + "[TTC] ERROR: the selected architecture doesn't support the selected precision yet." + ENDC
         exit(-1)
     if( (ttcArgs.architecture == "knc") and ttcArgs.hostName == "" ):
         print FAIL + "[TTC] ERROR: you are using the KNC or KNL please specify the hostname of the target card (e.g., --hostname=cluster-phi-mic0)" + ENDC
@@ -1000,13 +1000,14 @@ def generateTransposition( ttcArgs ):
             fastestVersion = generator.implementations[-1].getVersionName()
         if( emitReference or numSolutions == 1):
             code = generator.referenceImplementation.getImplementation(_parallelize, 1)
-            transposeName = generator.referenceImplementation.getTransposeName()
+            transposeName = generator.referenceImplementation.getTransposeName(1)
         else: 
             code = generator.generateVersion(fastestVersion)
         if( len(code) > 1):
             directory = workingDir +"/ttc_transpositions"
             if not os.path.exists(directory):
                 os.makedirs(directory)
+            generator.generateOffsetFile(directory)
 	    if(ttcArgs.compiler == "nvcc"):
 		cppFile = directory + "/%s.cu"%transposeName
                 f = open(cppFile ,'w')
