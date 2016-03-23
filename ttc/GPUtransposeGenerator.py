@@ -1,4 +1,3 @@
-##r __VERSION__ 40
 #
 # This script generates high-performance C/C++ code for any given multi-dimensional transposition.
 #
@@ -107,8 +106,6 @@ class GPUtransposeGenerator:
 		     print FAIL + "ERROR: Please choose a vector length less than 1024" + ENDC
 		     exit(-1)
 		       		 				 	 	 
-
-
         self.remainderA = 0
         self.remainderB = 0
         if( perm[0] != 0):
@@ -122,8 +119,6 @@ class GPUtransposeGenerator:
               self.remainderA = size[0] % 32
               self.remainderB = size[1] % 32
 
-
-	   
         minA=32    
         self.blockings = []
 	if(len(blockings) == 0):

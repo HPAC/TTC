@@ -103,7 +103,6 @@ class cuda_transpose:
 	code = ""
 	code += self.getCudaTransposeHeader()
 	code += "\n{\n"
-        code += "//perm = [ %s ]\n"%(self.getPermVersion())
 	code += "//loopPerm = [ %s ]\n\n"%(self.getloopPermVersion())
 	code += "   const int blockA = " + str(self.blocking[0]) + ";\n"
 	code += "   const int blockB = " + str(self.blocking[1]) + ";\n"
@@ -192,7 +191,7 @@ class cuda_transpose:
             code += self.getIndices(self.loopPerm, self.blocking[0],self.blocking[1])
             code += self.getMatCopy()
 	    
-        code += "  }\n"
+        code += "}\n"
 	
 	return code
 
@@ -205,7 +204,7 @@ class cuda_transpose:
 		code += "   int j0 = threadIdx.x/size0;\n"
                 code += "   for(int i=0; i<blockA; i++)\n"
 		code += "      for(int j=j0; j<blockB; j=j+%d)\n"%jump
-		code +="        {\n"
+		code += "      {\n"
 		code += "         int i0 = threadIdx.x % size0;\n"
                 if(self.remainderA !=0 or self.remainderB !=0):
 		    code += "           if((i1+i*nba) < size1 && (i%d+j*nbb) < size%d)\n"%(self.perm[1],self.perm[1])
@@ -219,47 +218,47 @@ class cuda_transpose:
 		code += "      int j0 = threadIdx.x/size0;\n"
                 code += "      for(int i=0; i<blockA; i++)\n"
 		code += "         for(int j=j0; j<blockB; j=j+%d)\n"%(jump)
-		code +="          {\n"
+		code += "         {\n"
 		code += "              int i0 = threadIdx.x % size0;\n"
                 if(self.remainderA !=0 or self.remainderB !=0):
 		    code += "          if((i1+i*nba) < size1 && (i%d+j*nbb) < size%d)\n"%(self.perm[1],self.perm[1])
                 code += self.getUpdateString("              ") 
-		code +="          }\n"
+		code += "         }\n"
 	        code += "   }\n"
 	         	
 	    else:
                 code += "   for(int i=0; i<blockA; i++)\n"
 		code += "      for(int j=0; j<blockB; j++)\n"
-	        code +="       {\n"
+	        code += "      {\n"
 		code += "         int i0 = threadIdx.x;\n"
                 if(self.remainderA !=0 or self.remainderB !=0):
-		    code += "          if(i0 < size0 && (i1+i*nba) < size1 && (i%d+j*nbb) < size%d)\n"%(self.perm[1],self.perm[1])
+		    code += "         if(i0 < size0 && (i1+i*nba) < size1 && (i%d+j*nbb) < size%d)\n"%(self.perm[1],self.perm[1])
                 else:
-		    code += "          if(i0 < size0)\n"
+		    code += "         if(i0 < size0)\n"
                 code += self.getUpdateString("              ") 
 		code +="       }\n"
 
 	elif(self.size[0] > self.vectorLength):
             code += "   for(int i=0; i<blockA; i++)\n"
-	    code +="       for(int j=0; j<blockB; j++)\n"
-	    code +="           for(int i0=threadIdx.x; i0<size0; i0=i0+%d)\n"%self.vectorLength
-	    code +="            {\n" 	
+	    code += "      for(int j=0; j<blockB; j++)\n"
+	    code += "         for(int i0=threadIdx.x; i0<size0; i0=i0+%d)\n"%self.vectorLength
+	    code += "         {\n" 	
             if(self.remainderA !=0 or self.remainderB !=0):
 		code += "             if(i0 < size0 && (i1+i*nba) < size1 && (i%d+j*nbb) < size%d)\n"%(self.perm[1],self.perm[1])
             code += self.getUpdateString("              ") 
 
-	    code +="           }\n"
+	    code += "         }\n"
 	
 	else:
             code += "   for(int i=0; i<blockA; i++)\n"
-	    code +="       for(int j=0; j<blockB; j++)\n"
-	    code +="       {\n"
+	    code += "      for(int j=0; j<blockB; j++)\n"
+	    code += "      {\n"
 	    code += "         int i0 = threadIdx.x;\n"
             if(self.remainderA !=0 or self.remainderB !=0):
 		code += "        if(i0 < size0 && (i1+i*nba) < size1 && (i%d+j*nbb) < size%d)\n"%(self.perm[1],self.perm[1])
             code += self.getUpdateString("              ")  	 
 
-	    code +="       }\n"
+	    code += "      }\n"
 
 	return code
 	    		   	     	
@@ -449,17 +448,15 @@ class cuda_transpose:
 	code = "\n\n"
 	code += self.getCudaTransposeHeader(0)
 	code += "\n{\n"
-	code += "  //size[%s]\n\n"%(self.getSizeStr())
 	#code += "   int numBlocks = %d;\n"%(max(self.getNumBlocks(),self.getNumRemainderBlocks(self.remainderA, self.remainderIndexA),self.getNumRemainderBlocks(self.remainderB, self.remainderIndexB)))
 	code += "   int numBlocks = %d;\n"%(self.getNumBlocks())
-	code += "   int numThreads = %d;\n\n"%(self.vectorLength)
 	if(self.isBeta):
-	    code += "   %s<<<numBlocks,numThreads>>>(A,B,alpha,beta);\n"%(self.getHeaderName(1))
+	    code += "   %s<<<numBlocks,%d>>>(A,B,alpha,beta);\n"%(self.getHeaderName(1), self.vectorLength)
 	else:
-	    code += "   %s<<<numBlocks,numThreads>>>(A,B,alpha);\n"%(self.getHeaderName(1))
+	    code += "   %s<<<numBlocks,%d>>>(A,B,alpha);\n"%(self.getHeaderName(1), self.vectorLength)
 	code += "   cudaDeviceSynchronize();\n"
         code +=  ttc_util.getCudaErrorChecking("   ", self.getHeaderName(1))
-        code += "\n}\n" 
+        code += "}\n" 
 
 	return code
 
