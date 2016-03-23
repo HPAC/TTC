@@ -87,11 +87,11 @@ class GPUtransposeGenerator:
         self.floatSizeA = self.__getFloatTypeSize()
         
         if(len(vectorLength) == 0):
-            self.vectorLength = [128,256,512]
+            self.vectorLength = [256] #[128,256,512]
         else:
             self.vectorLength = vectorLength
 	    if(self.perm[0] != 0):	
-	       available = [128,256,512]	
+	       available = [256] #[128,256,512]	
 	       for v in vectorLength:
 		   found=0
 		   for a in available:

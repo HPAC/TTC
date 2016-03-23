@@ -782,7 +782,7 @@ def generateTransposition( ttcArgs ):
             measurementId = sql_util.getMeasurementId(cursor, sizeId, permId,
                     ttcArgs.floatTypeA, ttcArgs.floatTypeB, ttcArgs.beta,
                     ttcArgs.numThreads, ttcArgs.hotA, ttcArgs.hotB,
-                    ttc_util.getCPUarchitecture()) #ttcArgs.architecture )
+                    ttc_util.getArchitecture(ttcArgs.architecture)) 
             if( measurementId != -1 ):
                 ret = sql_util.getBestImplementation(cursor, measurementId)
                 if(ret != -1):
