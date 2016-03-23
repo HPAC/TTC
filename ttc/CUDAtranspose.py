@@ -1,5 +1,6 @@
 import copy
 import math
+import ttc_util
 
 class cuda_transpose:
     def __init__(self,size,perm,loopPerm, floatType,blocking, vectorLength,isBeta,lda,ldb):
@@ -456,7 +457,8 @@ class cuda_transpose:
 	    code += "   %s<<<numBlocks,numThreads>>>(A,B,alpha,beta);\n"%(self.getHeaderName(1))
 	else:
 	    code += "   %s<<<numBlocks,numThreads>>>(A,B,alpha);\n"%(self.getHeaderName(1))
-	code += "cudaDeviceSynchronize();\n"
+	code += "   cudaDeviceSynchronize();\n"
+        code +=  ttc_util.getCudaErrorChecking("   ", self.getHeaderName(1))
         code += "\n}\n" 
 
 	return code

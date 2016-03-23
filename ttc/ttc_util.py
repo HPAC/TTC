@@ -43,6 +43,15 @@ class TTCargs:
         return copy.deepcopy(self.idxPerm)
 
 
+def getCudaErrorChecking(indent, routine):
+   tmpCode =indent+"{cudaError_t err = cudaGetLastError();\n"
+   tmpCode +=indent+"if(err != cudaSuccess){\n"
+   tmpCode +=indent+"   printf(\"\\nKernel ERROR in %s: %%s (line: %%d)\\n\", cudaGetErrorString(err), __LINE__);\n"%routine
+   tmpCode +=indent+"   exit(-1);\n"
+   tmpCode +=indent+"}}\n"
+   return tmpCode
+
+
     
 def listToString(l):
     out = ""
@@ -53,14 +62,24 @@ def listToString(l):
         out = out[:-1] + ")"
     return out
 
-def getCPUarchitecture():
-    f = open("/proc/cpuinfo", "r")
-    for l in f:
-        if( l.find("model name") != -1):
-            arch = l.split(":")[1]
-            pos = arch.find("@")
-            f.close()
-            return arch[0:pos]
+def getArchitecture(arch):
+    if( arch == "cuda" ):
+        try:
+            proc = subprocess.Popen(["nvidia-smi", "-L"],stdout=subprocess.PIPE)
+            proc.wait()
+        except OSError:
+            print FAIL + "[TTC] ERROR: nvidia-smi not found"%comp +ENDC
+            exit(-1)
+
+        return proc.communicate()[0].split(":")[1]
+    else:
+        f = open("/proc/cpuinfo", "r")
+        for l in f:
+            if( l.find("model name") != -1):
+                arch = l.split(":")[1]
+                pos = arch.find("@")
+                f.close()
+                return arch[0:pos]
 
 def getCostLoop(loopPerm, perm, size):
 

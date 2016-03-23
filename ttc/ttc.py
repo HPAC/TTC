@@ -1060,7 +1060,7 @@ def generateTransposition( ttcArgs ):
             measurement_id = insertIntoMeasurements(cursor,dim, host, version, ttcArgs.alpha,
                     ttcArgs.beta, ttcArgs.numThreads, compiler_version, ttcArgs.floatTypeA, ttcArgs.floatTypeB,0,
                     0, compilationTime, measuringTime, size_id, perm_id,
-                    _logFile, referenceBw, ttcArgs.hotA, ttcArgs.hotB, ttc_util.getCPUarchitecture()) #ttcArgs.architecture)
+                    _logFile, referenceBw, ttcArgs.hotA, ttcArgs.hotB, ttc_util.getArchitecture(ttcArgs.architecture)) #ttcArgs.architecture)
 
 
             for line in outputTiming:

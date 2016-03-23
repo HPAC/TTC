@@ -294,29 +294,30 @@ class GPUtransposeGenerator:
 
 
     def getFastestVersion(self,implementation ):
-	code = "#include <cuda_runtime.h>\n"
-	code = "#include <cuComplex.h>\n"
-        code = "#include <complex.h>\n\n"
-	code += implementation.getHostCall()
-	code += implementation.getCudaImplementation()
-	if(self.perm[0] !=0):
-            code += implementation.getSharedTransposeKernel()
-	    if(self.remainderA != 0 or self.remainderB != 0):
-	        code += implementation.getRemainderTransposeKernel(32)
+       code = "#include <cuda_runtime.h>\n"
+       code = "#include <cuComplex.h>\n"
+       code = "#include <complex.h>\n\n"
+       code = "#include <stdio.h>\n\n"
+       code += implementation.getHostCall()
+       code += implementation.getCudaImplementation()
+       if(self.perm[0] !=0):
+          code += implementation.getSharedTransposeKernel()
+          if(self.remainderA != 0 or self.remainderB != 0):
+             code += implementation.getRemainderTransposeKernel(32)
 
-	return code
+       return code
 		
 
 
     def __getFloatTypeSize(self):
-        if( self.floatTypeA == "float" ):
-            return 4
-        if( self.floatTypeA == "double" ):
-            return 8
-        if( self.floatTypeA == "float complex" ):
-            return 8
-        if( self.floatTypeA == "double complex" ):
-            return 16
+       if( self.floatTypeA == "float" ):
+           return 4
+       if( self.floatTypeA == "double" ):
+           return 8
+       if( self.floatTypeA == "float complex" ):
+           return 8
+       if( self.floatTypeA == "double complex" ):
+           return 16
 
 
 
@@ -435,14 +436,6 @@ class GPUtransposeGenerator:
         for j in range(self.dim):
             totalSize *= self.size[j]
         return totalSize
-
-    def getCudaErrorChecking(self, indent, routine):
-        tmpCode =indent+"{cudaError_t err = cudaGetLastError();\n"
-        tmpCode +=indent+"if(err != cudaSuccess){\n"
-        tmpCode +=indent+"   printf(\"\\nKernel ERROR in %s: %%s (line: %%d)\\n\", cudaGetErrorString(err), __LINE__);\n"%routine
-        tmpCode +=indent+"   exit(-1);\n"
-        tmpCode +=indent+"}}\n"
-        return tmpCode
 
     def printMain(self):
         code = ""
@@ -622,11 +615,11 @@ class GPUtransposeGenerator:
             tmpCode += "    double maxBandwidth = -1;\n"
 	    tmpCode += "    %s *d_A, *d_B;\n\n"%(self.floatTypeA)
 	    tmpCode += "    cudaMalloc(&d_A,total_size*sizeof(%s));\n"%(self.floatTypeA)
-            tmpCode +=  self.getCudaErrorChecking("    ", "measure%d"%i)
+            tmpCode +=  ttc_util.getCudaErrorChecking("    ", "measure%d"%i)
 	    tmpCode += "    cudaMalloc(&d_B,total_size*sizeof(%s));\n"%(self.floatTypeA)
-            tmpCode +=  self.getCudaErrorChecking("    ", "measure%d"%i)
+            tmpCode +=  ttc_util.getCudaErrorChecking("    ", "measure%d"%i)
 	    tmpCode += "    cudaMemcpy(d_A, A_const,total_size*sizeof(%s), cudaMemcpyHostToDevice);\n\n"%(self.floatTypeA)
-            tmpCode +=  self.getCudaErrorChecking("    ", "measure%d"%i)
+            tmpCode +=  ttc_util.getCudaErrorChecking("    ", "measure%d"%i)
             for j in range(i * numSolutionsPerFile, min(numImplementations,(i+1)*numSolutionsPerFile)):
                 implementation = self.implementations[j]
                 transposeName = implementation.getHeaderName(0)
@@ -640,7 +633,7 @@ class GPUtransposeGenerator:
                     tmpCode +="           if( i == 0 ){\n"
                     tmpCode +="               restore(B_copy_const, B, total_size);\n"
                     tmpCode +="                cudaMemcpy(d_B, B,total_size*sizeof(%s), cudaMemcpyHostToDevice);\n"%(self.floatTypeA) 	      
-                    tmpCode +=  self.getCudaErrorChecking("               ", transposeName)
+                    tmpCode +=  ttc_util.getCudaErrorChecking("               ", transposeName)
                     tmpCode +="            }\n"
                 tmpCode +="        double start, tmpTime;\n"
                 tmpCode +="        start = omp_get_wtime();\n"
@@ -649,10 +642,10 @@ class GPUtransposeGenerator:
                 else:
                     tmpCode +="        %s(d_A, d_B, alpha);\n"%transposeName
                 tmpCode +="        tmpTime = omp_get_wtime() - start;\n\n"
-                tmpCode +=  self.getCudaErrorChecking("        ", transposeName)
+                tmpCode +=  ttc_util.getCudaErrorChecking("        ", transposeName)
                 tmpCode +="        if( i == 0 )\n"
 		tmpCode +="           cudaMemcpy(B, d_B,total_size*sizeof(%s), cudaMemcpyDeviceToHost);\n\n"%(self.floatTypeA) 
-                tmpCode +=  self.getCudaErrorChecking("        ", transposeName)
+                tmpCode +=  ttc_util.getCudaErrorChecking("        ", transposeName)
                 tmpCode +="        if( tmpTime < time ) time = tmpTime;\n"
                 if( self.noTest == 0 ):
                     tmpCode +="        if(i == 0 && !equal(B_ref, B, total_size) )\n"
@@ -672,9 +665,9 @@ class GPUtransposeGenerator:
                 tmpCode +="   }\n\n\n"
                 counter += 1
 	    tmpCode += "    cudaFree(d_A);\n"
-            tmpCode +=  self.getCudaErrorChecking("    ", "measure%d"%i)
+            tmpCode +=  ttc_util.getCudaErrorChecking("    ", "measure%d"%i)
 	    tmpCode += "    cudaFree(d_B);\n"
-            tmpCode +=  self.getCudaErrorChecking("    ", "measure%d"%i)
+            tmpCode +=  ttc_util.getCudaErrorChecking("    ", "measure%d"%i)
             tmpCode +="   return maxBandwidth;\n"
             tmpCode +="}\n"
             f = open(self.tmpDirectory + "measure%d.cu"%i,'w')
@@ -709,6 +702,7 @@ class GPUtransposeGenerator:
 	for v in self.vectorLength:
 	    cudaTranspose = CUDAtranspose.cuda_transpose(self.size,self.perm,self.loopPermutations[0], self.floatTypeA,self.blockings[0],v,self.beta,self.lda,self.ldb)
 	    cudaCode = "#include <cuda_runtime.h>\n"
+	    cudaCode = "#include <stdio.h>\n"
 	    cudaCode += "#include <cuComplex.h>\n"
             ##code = "#include <complex.h>\n\n"
             if(self.perm[0] != 0):
