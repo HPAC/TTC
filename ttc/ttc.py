@@ -693,8 +693,13 @@ def generateTransposition( ttcArgs ):
     ###########################################
 
     if( ttcArgs.affinity == "" and ttcArgs.compiler != "nvcc"):
-        ttcArgs.affinity = "compact,1"
-        print WARNING + "WARNING: you did not specify an thread affinity. We are using: %s by default"%ttcArgs.affinity +ENDC
+        if(ttcArgs.compiler == "gcc" ):
+            ttcArgs.affinity = "0-23:2 1-24:2"
+            print WARNING + "WARNING: you did not specify an thread affinity. We are using: GOMP_CPU_AFFINITY=%s by default"%ttcArgs.affinity +ENDC
+            print WARNING + "WARNING: The default thread affinity might be suboptimal depending on the numbering of your CPU cores. We recommend using a ''compact'' thread affinity even for gcc (i.e., simulate KMP_AFFINITY=compact)."+ENDC
+        else:
+            ttcArgs.affinity = "compact,1"
+            print WARNING + "WARNING: you did not specify an thread affinity. We are using: KMP_AFFINITY=%s by default"%ttcArgs.affinity +ENDC
     if( ttcArgs.numThreads == 0 and ttcArgs.compiler != "nvcc"):
         print WARNING + "WARNING: you did not specify the number of threads. Try to use all available threads (i.e., numCores * SMT)." +ENDC
         ttcArgs.numThreads = multiprocessing.cpu_count()
@@ -890,7 +895,10 @@ def generateTransposition( ttcArgs ):
                 my_env = os.environ.copy()
                 if(ttcArgs.compiler != "nvcc"):
                     my_env["OMP_NUM_THREADS"] = str(ttcArgs.numThreads)
-                    my_env["KMP_AFFINITY"] = ttcArgs.affinity 
+                    if(ttcArgs.compiler == "gcc"):
+                        my_env["GOMP_CPU_AFFINITY"] = ttcArgs.affinity
+                    else:
+                        my_env["KMP_AFFINITY"] = ttcArgs.affinity 
 
                 t0 = _time.time()
                 outputTiming = []
