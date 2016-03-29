@@ -41,7 +41,7 @@ avx5122: all
 nvcc:
 	${MAKE} clean
 	${MAKE} nvcc2
-nvcc2: CXX_FLAGS = -rdc true -arch=sm_35 -lgomp -Xcudafe "--diag_suppress=declared_but_not_referenced"
+nvcc2: CXX_FLAGS = -rdc true -O3 -lgomp -Xcudafe "--diag_suppress=declared_but_not_referenced"
 nvcc2: CXX = nvcc
 nvcc2: all
 

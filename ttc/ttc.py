@@ -770,6 +770,19 @@ def generateTransposition( ttcArgs ):
     transposeName = getTransposeName(ttcArgs)
 
     ###########################################
+    # Print settings
+    ###########################################
+    if( ttcArgs.silent != 1):
+        print "--------------Settings---------------------"
+        print "#threads: ".ljust(60), ttcArgs.numThreads
+        if(ttcArgs.compiler == "gcc"):
+            print "thread affinity: ".ljust(60)+"GOMP_CPU_AFFINITY=%s"%ttcArgs.affinity
+        else:
+            print "thread affinity: ".ljust(60)+"KMP_AFFINITY=%s"%ttcArgs.affinity
+        print "Compiler: ".ljust(60) + ttc_util.getCompilerVersion(ttcArgs.compiler)
+        print "-------------------------------------------"
+
+    ###########################################
     # check if a solution already exists
     ###########################################
     connection = sqlite3.connect(_database)
