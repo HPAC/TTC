@@ -129,13 +129,21 @@ def getCostLoop(loopPerm, perm, size):
 #fuse consecutive indices in perm and invPerm to a single index (i.e., perform loop fusion)
 #size array of sizes corresponding to perm
 def fuseIndices(size, perm, loopPermutations, lda, ldb):
+    if(len(lda) == 0):
+        lda = []
+        for s in size:
+            lda.append(s)
+    if(len(ldb) == 0):
+        ldb = []
+        for i in range(len(size)):
+            ldb.append(size[perm[i]])
     inputIndices = range(len(size))
     #find all contiguous indices in inputIndices and invinputIndices
     for i in range(len(inputIndices)):
         for j in range(len(perm)):
             l = 0
             newSize = 1
-            while i+l < len(inputIndices) and j+l < len(perm) and inputIndices[i+l] == perm[j+l] and (l == 0 or lda[i+l] == lda[i+l-1] * size[i+l-1]) and (l == 0 or ldb[j+l] == ldb[j+l-1] * size[i+l-1]): #make sure that those indices will be cont. in A
+            while i+l < len(inputIndices) and j+l < len(perm) and inputIndices[i+l] == perm[j+l] and (l == 0 or lda[i+l-1] == size[i+l-1]) and (l == 0 or ldb[j+l-1] == size[i+l-1]): #make sure that those indices will be cont. in A
                 newSize *= size[i+l]
                 l += 1
 
@@ -146,7 +154,9 @@ def fuseIndices(size, perm, loopPermutations, lda, ldb):
                 inputIndices.pop(i+1)
                 perm.pop(j+1)
                 size.pop(i+1)
+                lda[i] *= lda[i+1]
                 lda.pop(i+1)
+                ldb[j] *= ldb[j+1]
                 ldb.pop(j+1)
                 l -= 1
 

@@ -74,6 +74,25 @@ class GPUtransposeGenerator:
         self.lda = copy.deepcopy(lda)
         self.ldb = copy.deepcopy(ldb)
 
+        if(len(self.lda) == 0): #convert LDA to the old style (TODO)
+            self.lda = [1]
+            for i in range(len(self.size)-1):
+               self.lda.append(self.lda[-1] * size[i])
+        else:
+            self.lda = [1]
+            for i in range(len(lda)-1):
+                self.lda.append(self.lda[-1] * lda[i])
+             
+        if(len(self.ldb) == 0): #convert LDB to the old style (TODO)
+            self.ldb = [1]
+            for i in range(len(self.size)-1):
+               self.ldb.append(self.ldb[-1] * size[perm[i]])
+        else:
+            self.ldb = [1]
+            for i in range(len(ldb)-1):
+                self.ldb.append(self.ldb[-1] * ldb[i])
+ 
+
         self.matCopy = 0
         count = 0
         t=0 

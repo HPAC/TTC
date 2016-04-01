@@ -85,18 +85,6 @@ def getTransposeName( ttcArgs ):
         if(idx != len(size)-1):
             name +="x"
 
-#    name +="_"
-#    for idx in range(len(lda)):
-#        name += "%d"%(lda[idx])
-#        if(idx != len(lda)-1):
-#            name +="x"
-#
-#    name +="_"
-#    for idx in range(len(ldb)):
-#        name += "%d"%(ldb[idx])
-#        if(idx != len(ldb)-1):
-#            name +="x"
-
     if( compiler != "nvcc" and numThreads > 1):
         name += "_par"
 
@@ -135,11 +123,11 @@ def printHelp():
     print "   --size=<size1>,<size2>,...,<sizeN>".ljust(60),"size of the input tensor"
     print ""
     print "optional arguments:"
-    print "   --lda=<size1>,<size2>,...,<sizeN>".ljust(60),"leading dimension of each dimension of the input tensor (this feature is still experimental)"
-    print "   --ldb=<size1>,<size2>,...,<sizeN>".ljust(60),"leading dimension of each dimension of the output tensor (this feature is still experimental)"
+    print "   --lda=<lda1>,<lda2>,...,<ldaN>".ljust(60),"leading dimension of each dimension of the input tensor"
+    print "   --ldb=<ldb1>,<ldb2>,...,<ldbN>".ljust(60),"leading dimension of each dimension of the output tensor"
     print "   --noStreamingStores".ljust(60),"disables streaming stores"
     print "   --maxImplementations=<value>".ljust(60),"limit the number of implementations"
-    print "   ".ljust(14),"-> Default: 500; -1 denotes 'no limit'" 
+    print "   ".ljust(14),"-> Default: 200; -1 denotes 'no limit'" 
     print "   --alpha=<value>".ljust(60),"alpha value (default: 1.0)"
     print "   --beta=<value>".ljust(60),"beta value (default: 0.0)"
     print "   --compiler=[gcc,intel,ibm,nvcc]".ljust(60),"choose compiler (default: intel)"
@@ -165,7 +153,7 @@ def printHelp():
     print "   --help".ljust(60),"prints this help"
     print "   --vecLength=<value>".ljust(60),"CUDA Vector length for GPU"
     print """   --architecture=
-    avx, power, avx512, knc, cuda 
+    avx, power (experimental), avx512 (experimental), knc, cuda 
     
     Default: avx
     
@@ -622,18 +610,6 @@ def insertIntoVariant(cursor, blockA, blockB, prefetchDistance,
     primaryKey = getLastPrimaryKey(cursor, _logFile)
     return primaryKey
 
-def getLda(size):
-    lda = [1]
-    for i in range(1,len(size)):
-        lda.append(lda[-1] * size[i-1])
-    return lda
-
-def getLdb(size, perm):
-    ldb = [1]
-    for i in range(1,len(size)):
-        ldb.append(ldb[i-1]*size[perm[i-1]])
-    return ldb
-
 def generateTransposition( ttcArgs ):
 
     compiler_version = ttc_util.getCompilerVersion(ttcArgs.compiler)
@@ -670,9 +646,9 @@ def generateTransposition( ttcArgs ):
     _database = "ttc.db"
 
     if(len (ttcArgs.lda) == 0):
-        ttcArgs.lda = getLda(ttcArgs.size)
+        ttcArgs.lda = []
     if(len (ttcArgs.ldb) == 0):
-        ttcArgs.ldb = getLdb(ttcArgs.size, ttcArgs.idxPerm)
+        ttcArgs.ldb = []
 
     ###########################################
     # fuse indices
@@ -732,17 +708,19 @@ def generateTransposition( ttcArgs ):
     # sanity check
     ###########################################
 
-    if(ttcArgs.lda[0] != 1 or ttcArgs.ldb[0] != 1):
-        print FAIL + "[TTC] ERROR: the stride for the leading dimension of A and B must be 1" + ENDC
-        exit(-1)
-    for i in range(1,len(ttcArgs.size)):
-        if( ttcArgs.lda[i] / ttcArgs.lda[i-1] < ttcArgs.size[i-1] ):
-            print FAIL + "[TTC] ERROR: the leading dimension of A for dim %d is smaller than allowed"%i + ENDC
-            print ttcArgs.lda[i], ttcArgs.lda[i-1], ttcArgs.size[i-1]
+    if( len(ttcArgs.ldb) != 0 and len(ttcArgs.ldb) != len(ttcArgs.size)):
+            print FAIL + "[TTC] ERROR: not all leading dimensions of B have been specified" + ENDC
             exit(-1)
-        if( ttcArgs.ldb[i] / ttcArgs.ldb[i-1] < ttcArgs.size[ttcArgs.idxPerm[i-1]]):
-            print FAIL + "[TTC] ERROR: the leading dimension of B for dim %d is smaller than allowed"%i + ENDC
-            print ttcArgs.ldb[i], ttcArgs.ldb[i-1], ttcArgs.size[ttcArgs.idxPerm[i-1]]
+    if( len(ttcArgs.lda) != 0 and len(ttcArgs.lda) != len(ttcArgs.size)):
+            print FAIL + "[TTC] ERROR: not all leading dimensions of A have been specified" + ENDC
+            exit(-1)
+    for i in range(len(ttcArgs.ldb)):
+        if(ttcArgs.size[ttcArgs.idxPerm[i]] > ttcArgs.ldb[i]):
+            print FAIL + "[TTC] ERROR: the leading dimension of B for dim %d is smaller than allowed (it must be >= %d)"%(i,ttcArgs.size[ttcArgc.idxPerm[i]]) + ENDC
+            exit(-1)
+    for i in range(len(ttcArgs.lda)):
+        if(ttcArgs.size[i] > ttcArgs.lda[i]):
+            print FAIL + "[TTC] ERROR: the leading dimension of A for dim %d is smaller than allowed (it must be >= %d)"%(i,ttcArgs.size[i]) + ENDC
             exit(-1)
     
     for prefetchDistance in ttcArgs.prefetchDistances:

@@ -395,16 +395,32 @@ class implementation:
         for i in range(self.dim):
             size_str += "int size%d, "%i
         size_str = size_str[:-2]
+        Astr = ""
+        Bstr = ""
+        for i in range(len(self.perm)):
+            Astr += "i%d,"%i
+            Bstr += "i%d,"%self.perm[i]
+        Astr = Astr[:-1]
+        Bstr = Bstr[:-1]
         if(self.beta != 0): 
             if( not clean ):
                 return "void %s( const %s* __restrict__ A, %s* __restrict__ B, const %s alpha, const %s beta, const int *size, const int *lda, const int *ldb)%s"% (transposeName, self.floatTypeA, self.floatTypeB, alphaFloatType,betaFloatType, trailingChar)
             else:
-                return "template<%s> void %s( const %s* __restrict__ A, %s* __restrict__ B, const %s alpha, const %s beta, const int *lda, const int *ldb)%s"% (size_str, transposeName, self.floatTypeA, self.floatTypeB, alphaFloatType,betaFloatType, trailingChar)
+                ret = ""
+                ret += "/**\n"
+                ret += " * B(%s) <- alpha * A(%s) + beta * B(%s);\n"%(Bstr,Astr,Bstr)
+                ret += " */\n"
+                ret += "template<%s>\nvoid %s( const %s* __restrict__ A, %s* __restrict__ B, const %s alpha, const %s beta, const int *lda, const int *ldb)%s"% (size_str, transposeName, self.floatTypeA, self.floatTypeB, alphaFloatType,betaFloatType, trailingChar)
+                return ret
         else: 
             if( not clean ):
                 return "void %s( const %s* __restrict__ A, %s* __restrict__ B, const %s alpha, const int *size, const int *lda, const int *ldb)%s"% (transposeName, self.floatTypeA, self.floatTypeB, alphaFloatType, trailingChar)
             else:
-                return "template<%s> void %s( const %s* __restrict__ A, %s* __restrict__ B, const %s alpha, const int *lda, const int *ldb)%s"% (size_str, transposeName, self.floatTypeA, self.floatTypeB, alphaFloatType, trailingChar)
+                ret += "/**\n"
+                ret += " * B(%s) <- alpha * A(%s);\n"%(Bstr,Astr)
+                ret += " */\n"
+                ret += "template<%s>\nvoid %s( const %s* __restrict__ A, %s* __restrict__ B, const %s alpha, const int *lda, const int *ldb)%s"% (size_str, transposeName, self.floatTypeA, self.floatTypeB, alphaFloatType, trailingChar)
+                return ret
 
 
     def printHeader(self, headerFlag = 1, clean = 0):
@@ -414,10 +430,33 @@ class implementation:
         if( not clean ):
             for i in range(self.dim):
                 self.code +=  "%sconst int size%d = size[%d];\n"%(self.indent,i,i)
-        for i in range(self.dim):
-            self.code +=  "%sconst int lda%d = lda[%d];\n"%(self.indent,i,i)
-        for i in range(self.dim):
-            self.code +=  "%sconst int ldb%d = ldb[%d];\n"%(self.indent,i,i)
+
+        #LDA
+        for i in range(1,self.dim):
+            self.code +=  "%sint lda%d;\n"%(self.indent,i)
+        self.code += "%sif( lda == NULL ){\n"%(self.indent)
+        self.code += "%s   lda1 = size0;\n"%(self.indent)
+        for i in range(2,self.dim):
+            self.code += "%s   lda%d = size%d * lda%d;\n"%(self.indent,i,i-1,i-1)
+        self.code += "%s}else{\n"%(self.indent)
+        self.code +=  "%s   lda1 = lda[0];\n"%(self.indent)
+        for i in range(2,self.dim):
+            self.code +=  "%s   lda%d = lda[%d] * lda%d;\n"%(self.indent,i,i-1,i-1)
+        self.code += "%s}\n"%(self.indent)
+
+        #LDB
+        for i in range(1,self.dim):
+            self.code +=  "%sint ldb%d;\n"%(self.indent,i)
+        self.code += "%sif( ldb == NULL ){\n"%(self.indent)
+        self.code += "%s   ldb1 = size%d;\n"%(self.indent,self.perm[0])
+        for i in range(2,self.dim):
+            self.code += "%s   ldb%d = size%d * ldb%d;\n"%(self.indent,i,self.perm[i-1],i-1)
+        self.code += "%s}else{\n"%(self.indent)
+        self.code +=  "%s   ldb1 = ldb[0];\n"%(self.indent)
+        for i in range(2,self.dim):
+            self.code +=  "%s   ldb%d = ldb[%d] * ldb%d;\n"%(self.indent,i,i-1,i-1)
+        self.code += "%s}\n"%(self.indent)
+
         if( self.perm[0] != 0 ):
             self.code +=   "%sconst int remainder0 = size0 %% %d;\n"%(self.indent,self.blockA)
             self.code +=   "%sconst int remainder%d = size%d %% %d;\n"%(self.indent,self.perm[0],self.perm[0], self.blockB)

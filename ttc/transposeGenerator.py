@@ -534,24 +534,40 @@ class transposeGenerator:
         line += "};\n"
         code +=line
 
-        line = "   int lda[] = {"
-        for i in range(self.dim):
-            line += str(self.lda[i])
-            if i != self.dim -1:
-                line += ","
-        line += "};\n"
+        maxSizeA = 1
+        if( len(self.lda) == 0):
+            for s in self.size:
+                maxSizeA *= s
+            line = "   int *lda = NULL;\n"
+        else:
+            for s in self.lda:
+                maxSizeA *= s
+            line = "   int lda[] = {"
+            for i in range(self.dim):
+                line += str(self.lda[i])
+                if i != self.dim -1:
+                    line += ","
+            line += "};\n"
         code +=line
 
-        line = "   int ldb[] = {"
-        for i in range(self.dim):
-            line += str(self.ldb[i])
-            if i != self.dim -1:
-                line += ","
-        line += "};\n"
+        maxSizeB = 1
+        if( len(self.ldb) == 0):
+            for s in self.size:
+                maxSizeB *= s
+            line = "   int *ldb = NULL;\n"
+        else:
+            for s in self.ldb:
+                maxSizeB *= s
+            line = "   int ldb[] = {"
+            for i in range(self.dim):
+                line += str(self.ldb[i])
+                if i != self.dim -1:
+                    line += ","
+            line += "};\n"
         code +=line
 
 
-        maxSize = max(self.lda[-1] * self.size[-1], self.ldb[-1] * self.size[self.perm[-1]])
+        maxSize = max(maxSizeA, maxSizeB)
         code +="   int total_size = %d;\n"%(maxSize)
         code +="   int elements_moved = 1;\n"
         code +="   //compute total size\n"
@@ -1105,7 +1121,7 @@ class transposeGenerator:
                 return code +static+"void %s(const %s* __restrict__ A, const int lda, %s* __restrict__ B, const int ldb%s)\n{\n"%(transposeMicroKernelname, self.floatTypeA, self.floatTypeB,self.getBroadcastVariables(1))
             else:
                 if( staticAndInline ):
-                    return code +"template<int size0> void %s(const %s* __restrict__ A, int lda1, const int lda, %s* __restrict__ B, const int ldb1, const int ldb%s)\n{\n"%(transposeMicroKernelname, self.floatTypeA, self.floatTypeB,self.getBroadcastVariables(1))
+                    return code +"template<int size0>\nvoid %s(const %s* __restrict__ A, int lda1, const int lda, %s* __restrict__ B, const int ldb1, const int ldb%s)\n{\n"%(transposeMicroKernelname, self.floatTypeA, self.floatTypeB,self.getBroadcastVariables(1))
                 else:
                     return code +static+"void %s(const %s* __restrict__ A, int lda1, const int lda, %s* __restrict__ B, const int ldb1, const int ldb%s)\n{\n"%(transposeMicroKernelname, self.floatTypeA, self.floatTypeB,self.getBroadcastVariables(1))
 

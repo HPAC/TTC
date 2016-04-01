@@ -78,6 +78,7 @@ class cuda_transpose:
        self.lda = copy.deepcopy(lda)
        self.ldb = copy.deepcopy(ldb)
 
+
        self.ldout = -1
        for i in range(len(self.perm)):
            if( self.perm[0] != 0 ):
