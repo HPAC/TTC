@@ -724,7 +724,7 @@ def generateTransposition( ttcArgs ):
             exit(-1)
     for i in range(len(ttcArgs.ldb)):
         if(ttcArgs.size[ttcArgs.idxPerm[i]] > ttcArgs.ldb[i]):
-            print FAIL + "[TTC] ERROR: the leading dimension of B for dim %d is smaller than allowed (it must be >= %d)"%(i,ttcArgs.size[ttcArgc.idxPerm[i]]) + ENDC
+            print FAIL + "[TTC] ERROR: the leading dimension of B for dim %d is smaller than allowed (it must be >= %d)"%(i,ttcArgs.size[ttcArgs.idxPerm[i]]) + ENDC
             exit(-1)
     for i in range(len(ttcArgs.lda)):
         if(ttcArgs.size[i] > ttcArgs.lda[i]):
