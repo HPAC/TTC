@@ -91,7 +91,10 @@ article [(pdf)](http://arxiv.org/pdf/1603.02297v1):
 @article{ttc2016a,
    author      = {Paul Springer and Jeff R. Hammond and Paolo Bientinesi},
    title       = {{TTC}: TTC: A high-performance Compiler for Tensor Transpositions},
-   journal     = {Arxiv},
+   archivePrefix = "arXiv",
+   eprint = {1603.02297},
+   primaryClass = "quant-ph",
+   journal     = {CoRR},
    year        = {2016},
    issue_date  = {March 2016},
    url         = {http://arxiv.org/abs/1603.02297}
