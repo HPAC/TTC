@@ -760,12 +760,12 @@ def generateTransposition( ttcArgs ):
     ###########################################
     if( ttcArgs.silent != 1):
         print "--------------Settings---------------------"
-        print "#threads: ".ljust(60), ttcArgs.numThreads
+        print "#threads: ".ljust(20)+"%d"%ttcArgs.numThreads
         if(ttcArgs.compiler == "g++"):
-            print "thread affinity: ".ljust(60)+"GOMP_CPU_AFFINITY=%s"%ttcArgs.affinity
+            print "thread affinity: ".ljust(20)+"GOMP_CPU_AFFINITY=%s"%ttcArgs.affinity
         else:
-            print "thread affinity: ".ljust(60)+"KMP_AFFINITY=%s"%ttcArgs.affinity
-        print "Compiler: ".ljust(60) + ttc_util.getCompilerVersion(ttcArgs.compiler)
+            print "thread affinity: ".ljust(20)+"KMP_AFFINITY=%s"%ttcArgs.affinity
+        print "Compiler: ".ljust(20) + ttc_util.getCompilerVersion(ttcArgs.compiler)
         print "-------------------------------------------"
 
     ###########################################
