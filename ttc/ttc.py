@@ -1,5 +1,3 @@
-### __VERSION__ 40
-#
 # This script generates high-performance C/C++ code for any given multi-dimensional transposition.
 #
 # Tensor-Contraction Compiler (TTC), copyright (C) 2015 Paul Springer (springer@aices.rwth-aachen.de)
@@ -93,18 +91,24 @@ def getTransposeName( ttcArgs ):
 
     return name
 
-def printEpilog(transposeName, beta):
+def printEpilog(transposeName, ttcArgs):
     print OKGREEN +"[SUCCESS]" + ENDC +" Please find the generated code under ./ttc_transpositions/%s.h\n"%transposeName
 
     print "------------------ Usage ------------------"
     print "// 1) include header"
-    print " #include \"%s.h\""%transposeName
+    print "#include \"%s.h\""%transposeName
     print ""
     print "// 2) execute transposition"
-    if(beta != 0):
-        print "%s(A, B, size, alpha, beta);"%transposeName
+    if(ttcArgs.beta != 0):
+        if(ttcArgs.architecture == "cuda"):
+            print "%s(A, B, alpha, beta);"%transposeName
+        else:
+            print "%s<size0, size1,..., sizeN>(A, B, alpha, beta, lda, ldb);"%transposeName
     else:
-        print "%s(A, B, size, alpha);"%transposeName
+        if(ttcArgs.architecture == "cuda"):
+            print "%s(A, B, size, alpha);"%transposeName
+        else:
+            print "%s<size0, size1,..., sizeN>(A, B, alpha, lda, ldb);"%transposeName
     print "-------------------------------------------"
 
 def printHelp():
@@ -125,33 +129,34 @@ def printHelp():
     print "optional arguments:"
     print "   --lda=<lda1>,<lda2>,...,<ldaN>".ljust(60),"leading dimension of each dimension of the input tensor"
     print "   --ldb=<ldb1>,<ldb2>,...,<ldbN>".ljust(60),"leading dimension of each dimension of the output tensor"
-    print "   --noStreamingStores".ljust(60),"disables streaming stores"
     print "   --maxImplementations=<value>".ljust(60),"limit the number of implementations"
     print "   ".ljust(14),"-> Default: 200; -1 denotes 'no limit'" 
-    print "   --alpha=<value>".ljust(60),"alpha value (default: 1.0)"
     print "   --beta=<value>".ljust(60),"beta value (default: 0.0)"
-    print "   --compiler=[gcc,intel,ibm,nvcc]".ljust(60),"choose compiler (default: intel)"
+    print "   --compiler=[g++,icpc,ibm,nvcc]".ljust(60),"choose compiler (default: icpc)"
     print "   --numThreads=<value>".ljust(60),"number of threads to launch"
-    print "   --affinity=<text>".ljust(60),"thread affinity (default: 'granularity=fine,compact,1,0')"
+    print """   --affinity=<text>".ljust(60),"thread affinity (default: 'granularity=fine,compact,1,0')
+    The value of this command-line argument sets the value for the KMP_AFFINITY or the GOMP_CPU_AFFINITY environment variable for icpc or g++ compiler, respectively.
+    For instance, using --compiler=icpc _and_ --affinity=compact,1 will set KMP_AFFINITY=compact,1.
+    Similarly, using --compiler=g++ _and_ --affinity=0-4 will set GOMP_CPU_AFFINITY=0-4."""
     print """   --dataType=[s,d,c,z,sd,ds,cz,zc]".ljust(60),"select the datatype: 
     's' : single-precision (default),  
     'd' : double-precision, 
     'c' : complex, 
     'z' : doubleComplex,
     'sd', 'ds', 'cz', 'zc': mixed precision; 'xy' denotes that the input tensor and output tensor respectively use the data type 'x' and 'y'."""
-    print "   --prefetchDistances=<value>[,<value>, ...]".ljust(60),"number of blocks ahead of the current block (default: 5)"
+    print "   --use-streamingStores".ljust(60),"enables streaming stores. Default: don't use streaming stores."
+    print "   --prefetchDistances=<value>[,<value>, ...]".ljust(60),"number of blocks ahead of the current block. Default: 5"
     print "   --blockings=<value>x<value>[,<value>x<value>, ...]".ljust(60),"available blockings (default: all)"
     print "   --verbose or -v".ljust(60),"prints compiler output"
     print "   --generateOnly".ljust(60),"only generates the implementations, no timing"
     print "   --noTest".ljust(60),"no validation will be done."
     print "   --ignoreDatabase".ljust(60),"Don't use the SQL database (i.e., no lookup)."
-    print "   --no-vec".ljust(60),"generate non-intrinsic code."
     print "   --no-align".ljust(60),"prevents use of aligned load/store instructions (use this if your arrays are not aligned)."
     print "   --loopPerm=<index1>,<index2>,...,<indexN>[-<next permutation>]".ljust(60),"generates only the specifed loop order"
     print "   --hotA".ljust(60),"Specifying this flag will keep the input tensor A in cache while measuring (this will not have any effect if A does not fit into the cache)."
     print "   --hotB".ljust(60),"Specifying this flag will keep the input tensor B in cache while measuring (this will not have any effect if B does not fit into the cache)."
     print "   --help".ljust(60),"prints this help"
-    print "   --vecLength=<value>".ljust(60),"CUDA Vector length for GPU"
+    print "   --threadsPerBlock=[128,256,512]".ljust(60),"Set the number of threads per threadblock (CUDA only). Default: 256."
     print """   --architecture=
     avx, power (experimental), avx512 (experimental), knc, cuda 
     
@@ -164,7 +169,7 @@ def printHelp():
 
 
     print ""
-    print "Example: \"ttc --perm=1,0,2 --size=1000,768,16 --alpha=1.0 --beta=1.0 --dataType=s\""
+    print "Example: \"ttc --perm=1,0,2 --size=1000,768,16 --beta=1.0 --dataType=s\""
     print "This will swap indices 0 and 1 while leaving index 2 in place.\n"
 
 def getInfoAboutVersion(version):
@@ -669,10 +674,10 @@ def generateTransposition( ttcArgs ):
     ###########################################
 
     if( ttcArgs.affinity == "" and ttcArgs.compiler != "nvcc"):
-        if(ttcArgs.compiler == "gcc" ):
+        if(ttcArgs.compiler == "g++" ):
             ttcArgs.affinity = "0-23:2 1-24:2"
             print WARNING + "WARNING: you did not specify an thread affinity. We are using: GOMP_CPU_AFFINITY=%s by default"%ttcArgs.affinity +ENDC
-            print WARNING + "WARNING: The default thread affinity might be suboptimal depending on the numbering of your CPU cores. We recommend using a ''compact'' thread affinity even for gcc (i.e., simulate KMP_AFFINITY=compact)."+ENDC
+            print WARNING + "WARNING: The default thread affinity might be suboptimal depending on the numbering of your CPU cores. We recommend using a ''compact'' thread affinity even for g++ (i.e., simulate KMP_AFFINITY=compact)."+ENDC
         else:
             ttcArgs.affinity = "compact,1"
             print WARNING + "WARNING: you did not specify an thread affinity. We are using: KMP_AFFINITY=%s by default"%ttcArgs.affinity +ENDC
@@ -708,6 +713,9 @@ def generateTransposition( ttcArgs ):
     # sanity check
     ###########################################
 
+    if( ttcArgs.align == 0 and ttcArgs.architecture == "knc"):
+            print FAIL + "[TTC] ERROR: non-aligned transpositions are not supported for KNC" + ENDC
+            exit(-1)
     if( len(ttcArgs.ldb) != 0 and len(ttcArgs.ldb) != len(ttcArgs.size)):
             print FAIL + "[TTC] ERROR: not all leading dimensions of B have been specified" + ENDC
             exit(-1)
@@ -753,7 +761,7 @@ def generateTransposition( ttcArgs ):
     if( ttcArgs.silent != 1):
         print "--------------Settings---------------------"
         print "#threads: ".ljust(60), ttcArgs.numThreads
-        if(ttcArgs.compiler == "gcc"):
+        if(ttcArgs.compiler == "g++"):
             print "thread affinity: ".ljust(60)+"GOMP_CPU_AFFINITY=%s"%ttcArgs.affinity
         else:
             print "thread affinity: ".ljust(60)+"KMP_AFFINITY=%s"%ttcArgs.affinity
@@ -804,7 +812,7 @@ def generateTransposition( ttcArgs ):
                         ttcArgs.prefetchDistances = [ prefetchDistance ]
                         if( ttcArgs.silent != 1):
                             print "Solution already exists: generating the solution which was found previously."
-                            printEpilog(transposeName, ttcArgs.beta)
+                            printEpilog(transposeName, ttcArgs)
 
 #    if( solutionFound == 0):
 #        print sizeId, ttcArgs.size, ttcArgs.idxPerm
@@ -886,7 +894,7 @@ def generateTransposition( ttcArgs ):
                 my_env = os.environ.copy()
                 if(ttcArgs.compiler != "nvcc"):
                     my_env["OMP_NUM_THREADS"] = str(ttcArgs.numThreads)
-                    if(ttcArgs.compiler == "gcc"):
+                    if(ttcArgs.compiler == "g++"):
                         my_env["GOMP_CPU_AFFINITY"] = ttcArgs.affinity
                     else:
                         my_env["KMP_AFFINITY"] = ttcArgs.affinity 
@@ -955,11 +963,11 @@ def generateTransposition( ttcArgs ):
                         if( float(tokens[4]) < fastestVersionTime ):
                             fastestVersion = tokens[2]
                             fastestVersionBW = float(tokens[7])
-                            if( ttcArgs.silent != 1):
-                                print "Reference version attains %f GiB/s."%(referenceBw)
+                            #if( ttcArgs.silent != 1):
+                            #    print "Reference version attains %f GiB/s."%(referenceBw)
                     elif( len(tokens) >= 7  and tokens[0] == "variant" and tokens[2] == "took" ):
-                        if( ttcArgs.silent != 1):
-                            print "Version %s attains %f GiB/s."%(tokens[1],float(tokens[6]))
+                        #if( ttcArgs.silent != 1):
+                        #    print "Version %s attains %f GiB/s."%(tokens[1],float(tokens[6]))
                         if( float(tokens[3]) < fastestVersionTime ):
                             fastestVersion = tokens[1]
                             fastestVersionTime = float(tokens[3])
@@ -986,7 +994,7 @@ def generateTransposition( ttcArgs ):
                     print "Measuring took %f seconds"%measuringTime
                     if( referenceBw > 0 ):
                         print "Speedup over reference: %.2f"%(fastestVersionBW/referenceBw)
-                    print "\nThe fastest version (%s) attains %f GiB/s.\n"%(fastestVersion,fastestVersionBW)
+                    print "\nThe fastest version (%s) attains %.2f GiB/s.\n"%(fastestVersion,fastestVersionBW)
 
         ###########################################
         # save fastest version to file
@@ -1033,7 +1041,7 @@ def generateTransposition( ttcArgs ):
             f.close()
 
             if( ttcArgs.silent != 1):
-                printEpilog(transposeName, ttcArgs.beta)
+                printEpilog(transposeName, ttcArgs)
 
 
         ###########################################
@@ -1092,12 +1100,12 @@ def generateTransposition( ttcArgs ):
 
 def main():
 
-    _allowedArguments = [ "--compiler","--noStreamingStores","--maxImplementations",
+    _allowedArguments = [ "--compiler","--use-streamingStores","--maxImplementations",
             "--help","--alpha","--beta","--papi","--size","--perm", "--loopPerm","--dataType",
             "--numThreads", "--generateOnly","--prefetchDistances",
             "--updateDatabase","--dontCompile","-v", "--blockings",
             "--noTest","--no-align","--no-vec","--mpi", "--architecture",
-            "--affinity","--lda", "--ldb", "--ignoreDatabase", "--vecLength", "--hotA", "--hotB"]
+            "--affinity","--lda", "--ldb", "--ignoreDatabase", "--threadsPerBlock", "--hotA", "--hotB"]
 
     _hotA = 0
     _hotB = 0
@@ -1109,7 +1117,7 @@ def main():
     _prefetchDistances = []
     _papi = 0
     _numThreads = 0
-    _streamingStores = 1
+    _streamingStores = 0
     _idxPerm = []
     _size = []
     _lda = []
@@ -1122,7 +1130,7 @@ def main():
     _floatTypeB = "float"
     _debug = 0
     _mpi = 0
-    _compiler = "intel"
+    _compiler = "icpc"
     _architecture= "avx"
     _generateOnly = 0
     _logFile = open("log.txt","a+")
@@ -1161,8 +1169,8 @@ def main():
             _noTest = 1
         if arg == "--updateDatabase":
             _updateDatabase = 1
-        if arg == "--noStreamingStores":
-            _streamingStores = 0
+        if arg == "--use-streamingStores":
+            _streamingStores = 1
         if arg == "-v":
             _debug = 1
         if arg == "--verbose":
@@ -1193,10 +1201,10 @@ def main():
         if arg == "--help":
             _showHelp = 1
         if arg.find("--compiler=") != -1:
-            if( arg.split("=")[1] == "intel" ):
-                _compiler = "intel"
-            elif( arg.split("=")[1] == "gcc" ):
-                _compiler = "gcc"
+            if( arg.split("=")[1] == "icpc" ):
+                _compiler = "icpc"
+            elif( arg.split("=")[1] == "g++" ):
+                _compiler = "g++"
             elif( arg.split("=")[1] == "ibm" ):
                 _compiler = "ibm"
                 _architecture = "power"
@@ -1254,10 +1262,14 @@ def main():
             for blocking in blockings:
                 _blockings.append((int(blocking.split("x")[0]),int(blocking.split("x")[1])))
 
-        if arg.find("--vecLength=") != -1:
+        if arg.find("--threadsPerBlock=") != -1:
             vectorLengths = arg.split("=")[1].split(",")
             for v in vectorLengths:
-                _vecLength.append(int(v))
+                if(int(v) != 256 and int(v) != 128 and int(v) != 512):
+                    print "[TTC] ERROR: value for --threadsPerBlock is not valid. It needs to be either 128, 256 or 512."
+                    exit(-1)
+                else:
+                    _vecLength.append(int(v))
 
         if arg.find("--size=") != -1:
             sizes = arg.split("=")[1]

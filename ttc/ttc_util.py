@@ -29,7 +29,7 @@ class TTCargs:
         self.scalar = 0
         self.silent = 0
         self.ignoreDatabase = 0
-        self.compiler = "intel"
+        self.compiler = "icpc"
         self.hostName = ""
         self.vecLength = []
         self.hotA = 0
@@ -194,9 +194,9 @@ def fuseIndices(size, perm, loopPermutations, lda, ldb):
 
 def getCompilerVersion(compiler):
     comp = ""
-    if( compiler == "intel" ):
+    if( compiler == "icpc" ):
         comp = "icpc"
-    if( compiler == "gcc" ):
+    if( compiler == "g++" ):
         comp = "g++"
     if( compiler == "ibm" ):
         comp = "bgxlc"

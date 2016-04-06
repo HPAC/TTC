@@ -1,5 +1,3 @@
-### __VERSION__ 40
-#
 # This script generates high-performance C/C++ code for any given multi-dimensional transposition.
 #
 # Tensor-Contraction Compiler (TTC), copyright (C) 2015 Paul Springer (springer@aices.rwth-aachen.de)
@@ -416,7 +414,7 @@ class implementation:
             if( not clean ):
                 return "void %s( const %s* __restrict__ A, %s* __restrict__ B, const %s alpha, const int *size, const int *lda, const int *ldb)%s"% (transposeName, self.floatTypeA, self.floatTypeB, alphaFloatType, trailingChar)
             else:
-                ret += "/**\n"
+                ret = "/**\n"
                 ret += " * B(%s) <- alpha * A(%s);\n"%(Bstr,Astr)
                 ret += " */\n"
                 ret += "template<%s>\nvoid %s( const %s* __restrict__ A, %s* __restrict__ B, const %s alpha, const int *lda, const int *ldb)%s"% (size_str, transposeName, self.floatTypeA, self.floatTypeB, alphaFloatType, trailingChar)

@@ -1,5 +1,3 @@
-### __VERSION__ 40
-#
 # This script generates high-performance C/C++ code for any given multi-dimensional transposition.
 #
 # Tensor-Contraction Compiler (TTC), copyright (C) 2015 Paul Springer (springer@aices.rwth-aachen.de)

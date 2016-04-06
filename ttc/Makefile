@@ -10,14 +10,14 @@ OBJ=$(SRC:.cpp=.o)
 TYPE= cpp
 endif
 
-gcc: 
+g++: 
 	${MAKE} clean 
 	${MAKE} gcc2
 gcc2: CXX_FLAGS += -fopenmp  -march=native -Wno-attributes
 gcc2: CXX=g++
 gcc2: all
 
-intel: 
+icpc: 
 	${MAKE} clean 
 	${MAKE} intel2
 intel2: CXX_FLAGS += -openmp -xhost

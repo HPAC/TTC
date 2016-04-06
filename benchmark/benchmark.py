@@ -47,7 +47,7 @@ _permutations = [
 
 
 
-_genString = "ttc --alpha=%f --beta=%f --maxImplementations=-1 --numThreads=%d "%(_alpha,_beta,_numThreads)
+_genString = "ttc --alpha=%f --beta=%f --maxImplementations=200 --numThreads=%d --compiler=icpc --architecture=avx"%(_alpha,_beta,_numThreads)
 
 def output(size, perm):
         sizeStr = ""
