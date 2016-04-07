@@ -459,8 +459,10 @@ class implementation:
             self.code +=   "%sconst int remainder0 = size0 %% %d;\n"%(self.indent,self.blockA)
             self.code +=   "%sconst int remainder%d = size%d %% %d;\n"%(self.indent,self.perm[0],self.perm[0], self.blockB)
         else:
-            self.code +=   "%sconst int remainder1 = size1 %% %d;\n"%(self.indent,self.blockA)
-            self.code +=   "%sconst int remainder%d = size%d %% %d;\n"%(self.indent,self.perm[1],self.perm[1], self.blockB)
+            if(self.blockA != 1):
+                self.code +=   "%sconst int remainder1 = size1 %% %d;\n"%(self.indent,self.blockA)
+            if(self.blockB != 1):
+                self.code +=   "%sconst int remainder%d = size%d %% %d;\n"%(self.indent,self.perm[1],self.perm[1], self.blockB)
         if( self.prefetchDistance > 0 and self.debug ):
             self.code +=   "%sint offsetAnext = 0, offsetBnext = 0;\n"%(self.indent)
 
