@@ -31,14 +31,28 @@ import ttc_util
 
 
 class referenceTranspose:
-    def __init__(self,perm,loopPerm,size,alpha,beta,floatType,lda,ldb):
+    def __init__(self,perm,loopPerm,size,alpha,beta,floatTypeA,floatTypeB,lda,ldb):
         
 	self.perm = copy.deepcopy(perm)
 	self.loopPerm = copy.deepcopy(loopPerm)
 	self.size = copy.deepcopy(size)
 	self.alpha = alpha
 	self.beta = beta
-	self.floatType = floatType
+	self.floatTypeA = floatTypeA
+        self.floatTypeB = floatTypeB
+
+        self.alphaFloatType = "float"
+        if( self.floatTypeA.find("double") != -1 ):
+            self.alphaFloatType = "double"
+        if(self.floatTypeA == "cuDoubleComplex"):
+            self.alphaFloatType = "double"
+
+        self.betaFloatType = "float"
+        if( self.floatTypeB.find("double") != -1 ):
+            self.betaFloatType = "double"
+        if(self.floatTypeB == "cuDoubleComplex"):
+            self.betaFloatType = "double"
+
 	self.indent = "   "
         self.dim = len(perm)
         #compute leading dimensions
@@ -80,21 +94,45 @@ class referenceTranspose:
 
         ret = ""
 
-        if(self.floatType == "float" or self.floatType == "double"):
+        if(self.floatTypeA == "float" or self.floatTypeA == "double"):
            if(self.beta != 0):
               ret +=  "%s%s = alpha*%s + beta*%s;\n"%(indent + self.indent, outStr, inStr,outStr)
            else:
               ret +=  "%s%s = alpha*%s;\n"%(indent + self.indent, outStr, inStr)
-        if(self.floatType == "cuFloatComplex"):
+        
+        if(self.floatTypeA == "cuFloatComplex"):
+          CuMulA = "cuCmulf"
+        if(self.floatTypeA == "cuDoubleComplex"):
+          CuMulA = "cuCmul"  
+        if(self.floatTypeB == "cuFloatComplex"):
+          CuMulB = "cuCmulf"
+        if(self.floatTypeB == "cuDoubleComplex"):
+          CuMulB = "cuCmul" 
+        mixed = 1
+        if(self.floatTypeA == self.floatTypeB):
+            mixed = 0
+        
+        if(self.floatTypeB == "cuFloatComplex" and mixed == 0):
            if(self.beta != 0):
-              ret +=  "%s%s = cuCaddf(cuCmulf(cuAlpha,%s) , cuCmulf(cuBeta,%s));\n"%(indent + self.indent, outStr, inStr,outStr)
+              ret +=  "%s%s = cuCaddf(%s(cuAlpha,%s) , %s(cuBeta,%s));\n"%(indent + self.indent, outStr,CuMulA, inStr,CuMulB,outStr)
            else:
-              ret +=  "%s%s = cuCmulf(cuAlpha,%s);\n"%(indent + self.indent, outStr, inStr)
-        if(self.floatType == "cuDoubleComplex"):
+              ret +=  "%s%s = %s(cuAlpha,%s);\n"%(indent + self.indent, outStr, CuMulA, inStr)
+        if(self.floatTypeB == "cuDoubleComplex" and mixed == 0):
            if(self.beta != 0):
-              ret +=  "%s%s = cuCadd(cuCmul(cuAlpha,%s) , cuCmul(cuBeta,%s));\n"%(indent + self.indent, outStr, inStr,outStr)
+              ret +=  "%s%s = cuCadd(%s(cuAlpha,%s) , %s(cuBeta,%s));\n"%(indent + self.indent, outStr,CuMulA, inStr,CuMulB,outStr)
            else:
-              ret +=  "%s%s = cuCmul(cuAlpha,%s);\n"%(indent + self.indent, outStr, inStr)
+              ret +=  "%s%s = %s(cuAlpha,%s);\n"%(indent + self.indent, outStr,CuMulA, inStr)
+
+        if(self.floatTypeB == "cuFloatComplex" and mixed == 1):
+           if(self.beta != 0):
+              ret +=  "%s%s = cuCaddf(cuComplexDoubleToFloat(%s(cuAlpha,%s)) , %s(cuBeta,%s));\n"%(indent + self.indent, outStr,CuMulA, inStr,CuMulB,outStr)
+           else:
+              ret +=  "%s%s = cuComplexDoubleToFloat(%s(cuAlpha,%s));\n"%(indent + self.indent, outStr, CuMulA, inStr)
+        if(self.floatTypeB == "cuDoubleComplex" and mixed == 1):
+           if(self.beta != 0):
+              ret +=  "%s%s = cuCadd(cuComplexFloatToDouble(%s(cuAlpha,%s)) , %s(cuBeta,%s));\n"%(indent + self.indent, outStr,CuMulA, inStr,CuMulB,outStr)
+           else:
+              ret +=  "%s%s = cuComplexFloatToDouble(%s(cuAlpha,%s));\n"%(indent + self.indent, outStr,CuMulA, inStr)
 
         return ret
 
@@ -118,18 +156,26 @@ class referenceTranspose:
 	return code
 
     def getReferenceHeader(self,signature=0):
-        alphaFloatType = "float"
-        if( self.floatType.find("double") != -1 ):
-            alphaFloatType = "double"
+        if(self.floatTypeA == "float"):
+            tmpChar = "s"
+        if(self.floatTypeA == "double"):
+            tmpChar = "d"
+        elif(self.floatTypeA == "cuFloatComplex"):
+            tmpChar = "c"
+        elif(self.floatTypeA == "cuDoubleComplex"):
+            tmpChar = "z"
 
-        if(self.floatType == "float"):
-            transposeName = "sCuTranspose_"
-        elif(self.floatType == "double"):
-            transposeName = "dCuTranspose_"
-        elif(self.floatType == "cuFloatComplex"):
-            transposeName = "cCuTranspose_"
-        elif(self.floatType == "cuDoubleComplex"):
-            transposeName = "zCuTranspose_"
+        if(self.floatTypeA != self.floatTypeB):
+           if(self.floatTypeB == "float"):
+               tmpChar += "s"
+           if(self.floatTypeB == "double"):
+               tmpChar += "d"
+           elif(self.floatTypeB == "cuFloatComplex"):
+               tmpChar += "c"
+           elif(self.floatTypeB == "cuDoubleComplex"):
+               tmpChar += "z"
+
+        transposeName = "%sCuTranspose_"%tmpChar
         
         for i in self.perm:
             transposeName += str(i)
@@ -140,18 +186,6 @@ class referenceTranspose:
              if(idx != len(self.size)-1):
 		 transposeName +="x"
 
-        transposeName +="_"
-        for idx in range(len(self.lda)):
-             transposeName += "%d"%(self.lda[idx])
-             if(idx != len(self.lda)-1):
-		 transposeName +="x"
-
-	transposeName +="_"
-        for idx in range(len(self.ldb)):
-             transposeName += "%d"%(self.ldb[idx])
-             if(idx != len(self.ldb)-1):
-		 transposeName +="x"
-
 	transposeName +="_reference"
 	if(self.beta == 0):
 	    transposeName +="_bz"
@@ -160,19 +194,15 @@ class referenceTranspose:
         code += "%s"%(transposeName)
 	if(signature):
 	    if(self.beta == 0): 
-	        code += "(const %s *A, %s *B, int* sizeA, const %s alpha)"%(self.floatType, self.floatType,alphaFloatType)
+	        code += "(const %s *A, %s *B, int* sizeA, const %s alpha, const int *lda, const int *ldb)"%(self.floatTypeA, self.floatTypeB,self.alphaFloatType)
 	    else:
-		code += "(const %s *A, %s *B, int* sizeA, const %s alpha, const %s beta)"%(self.floatType, self.floatType,alphaFloatType, alphaFloatType) 	
+		code += "(const %s *A, %s *B, int* sizeA, const %s alpha, const %s beta, const int *lda, const int *ldb)"%(self.floatTypeA, self.floatTypeB,self.alphaFloatType, self.betaFloatType) 	
 	return code
 
 
     def generateReferenceImplementation(self):
 
         self.code += "//Loop-order: " + str(self.loopPerm) + " Theoretical cost: " + str(self.cost) + "\n"
-
-        alphaFloatType = "float"
-        if( self.floatType.find("double") != -1 ):
-            alphaFloatType = "double"
         
         self.code += "void %s\n{\n\n"%(self.getReferenceHeader(1))
 
@@ -187,19 +217,27 @@ class referenceTranspose:
     def declareVariables(self):
 	code=""
         for i in range(self.dim):
-            code +=  "%sconst int size%d = sizeA[%d];\n"%(self.indent,i,i)
+            code +=  "%sconst int size%d = %d;\n"%(self.indent,i,self.size[i])
         for i in range(len(self.lda)):
-            code +=  "%sconst int lda%d = %d;\n"%(self.indent,i,self.lda[i])
+            if( i == 0):
+               code +=  "%sconst int lda0 = 1;\n"%(self.indent)
+            else:
+               code +=  "%sconst int lda%d = lda%d*lda[%d];\n"%(self.indent,i,i-1,i-1)
         for i in range(len(self.ldb)):
-            code +=  "%sconst int ldb%d = %d;\n"%(self.indent,i,self.ldb[i])
+            if( i == 0):
+               code +=  "%sconst int ldb0 = 1;\n"%(self.indent)  
+            else:      
+               code +=  "%sconst int ldb%d = ldb%d*ldb[%d];\n"%(self.indent,i,i-1,i-1)
 
-        if(self.floatType == "cuFloatComplex"):
+        if(self.floatTypeA == "cuFloatComplex"):
             code +=   "%scuFloatComplex cuAlpha = make_cuFloatComplex(alpha,0.0);\n"%self.indent
+        if(self.floatTypeB == "cuFloatComplex"):
             if(self.beta != 0):
                 code +=   "%scuFloatComplex cuBeta = make_cuFloatComplex(beta,0.0);\n"%self.indent
 
-        if(self.floatType == "cuDoubleComplex"):
+        if(self.floatTypeA == "cuDoubleComplex"):
             code +=   "%scuDoubleComplex cuAlpha = make_cuDoubleComplex(alpha,0.0);\n"%self.indent
+        if(self.floatTypeB == "cuDoubleComplex"):
             if(self.beta != 0):
                 code +=   "%scuDoubleComplex cuBeta = make_cuDoubleComplex(beta,0.0);\n"%self.indent
 

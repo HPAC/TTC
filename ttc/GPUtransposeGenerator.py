@@ -45,9 +45,9 @@ class GPUtransposeGenerator:
         self.floatTypeB = floatTypeB
         self.cacheLineSize = 128 #in bytes
 
-        if(floatTypeA != floatTypeB):
-            print "ERROR: mixed precision has not been implemented for cuda yet."
-            exit(-1)
+       # if(floatTypeA != floatTypeB):
+       #     print "ERROR: mixed precision has not been implemented for cuda yet."
+       #     exit(-1)
        
         self.alpha = alpha
         self.beta = beta
@@ -55,13 +55,23 @@ class GPUtransposeGenerator:
         self.alphaFloatType = "float"
         if( self.floatTypeA.find("double") != -1 ):
             self.alphaFloatType = "double"
+
+
+        self.betaFloatType = "float"
+        if( self.floatTypeB.find("double") != -1 ):
+            self.betaFloatType = "double"
 	    self.precision = 1e-10
 
         if(self.floatTypeA == "float complex"):
              self.floatTypeA = "cuFloatComplex"
         if(self.floatTypeA == "double complex"):
              self.floatTypeA = "cuDoubleComplex"
-             self.alphaFloatType = "double"
+
+
+        if(self.floatTypeB == "float complex"):
+             self.floatTypeB = "cuFloatComplex"
+        if(self.floatTypeB == "double complex"):
+             self.floatTypeB = "cuDoubleComplex"
 	     self.precision = 1e-10
      
        
@@ -74,23 +84,14 @@ class GPUtransposeGenerator:
         self.lda = copy.deepcopy(lda)
         self.ldb = copy.deepcopy(ldb)
 
-        if(len(self.lda) == 0): #convert LDA to the old style (TODO)
-            self.lda = [1]
-            for i in range(len(self.size)-1):
-               self.lda.append(self.lda[-1] * size[i])
-        else:
-            self.lda = [1]
-            for i in range(len(lda)-1):
-                self.lda.append(self.lda[-1] * lda[i])
+        if(len(self.lda) == 0): #convert LDA to the old style (TODO) DONE**
+            for i in range(len(self.size)):
+               self.lda.append(size[i])
+
              
-        if(len(self.ldb) == 0): #convert LDB to the old style (TODO)
-            self.ldb = [1]
-            for i in range(len(self.size)-1):
-               self.ldb.append(self.ldb[-1] * size[perm[i]])
-        else:
-            self.ldb = [1]
-            for i in range(len(ldb)-1):
-                self.ldb.append(self.ldb[-1] * ldb[i])
+        if(len(self.ldb) == 0): #convert LDB to the old style (TODO) DONE**
+            for i in range(len(self.size)):
+               self.ldb.append(size[perm[i]])
  
 
         self.matCopy = 0
@@ -103,7 +104,7 @@ class GPUtransposeGenerator:
 	if(count == t):
 	    self.matCopy = 1
       
-        self.floatSizeA = self.__getFloatTypeSize()
+        self.floatSizeA = self.__getFloatTypeASize()
         
         if(len(vectorLength) == 0):
             self.vectorLength = [256] #[128,256,512]
@@ -189,7 +190,7 @@ class GPUtransposeGenerator:
         self.maxNumImplementations = maxNumImplementations
 
         #generate scalar version as reference
-        self.referenceImplementation = GPUreference.referenceTranspose( self.perm, range(len(perm))[-1::-1], self.size, self.alpha, self.beta, self.floatTypeA,self.lda,self.ldb)
+        self.referenceImplementation = GPUreference.referenceTranspose( self.perm, range(len(perm))[-1::-1], self.size, self.alpha, self.beta, self.floatTypeA,self.floatTypeB,self.lda,self.ldb)
 
 
         #create tmp directory or delete existing .cu files
@@ -298,7 +299,7 @@ class GPUtransposeGenerator:
     def generateVersion(self,versionStr):
         for impl in self.implementations:
             if( impl.getVersionName() == versionStr ): 
-                return (self.getFastestVersion(impl), impl.getCudaTransposeHeader(0) + ";\n")
+                return (self.getFastestVersion(impl), impl.getCudaTransposeHeader(0,1) + ";\n")
         return ""
 
     def generate(self):
@@ -309,31 +310,29 @@ class GPUtransposeGenerator:
 
     def getFastestVersion(self,implementation ):
        code = "#include <cuda_runtime.h>\n"
-       code = "#include <cuComplex.h>\n"
-       code = "#include <complex.h>\n\n"
-       code = "#include <stdio.h>\n\n"
-       code += implementation.getHostCall()
-       code += implementation.getCudaImplementation()
+       code += "#include <cuComplex.h>\n"
+       code += "#include <complex.h>\n"
+       code += "#include <stdio.h>\n\n"
+       code += implementation.getHostCall(1)
+       code += implementation.getCudaImplementation(1)
        if(self.perm[0] !=0):
           code += implementation.getSharedTransposeKernel()
-          if(self.remainderA != 0 or self.remainderB != 0):
-             code += implementation.getRemainderTransposeKernel(32)
+          #if(self.remainderA != 0 or self.remainderB != 0):
+          code += implementation.getRemainderTransposeKernel(32)
 
        return code
 		
 
 
-    def __getFloatTypeSize(self):
+    def __getFloatTypeASize(self):
        if( self.floatTypeA == "float" ):
            return 4
        if( self.floatTypeA == "double" ):
            return 8
-       if( self.floatTypeA == "float complex" ):
+       if( self.floatTypeA == "cuFloatComplex" ):
            return 8
-       if( self.floatTypeA == "double complex" ):
+       if( self.floatTypeA == "cuDoubleComplex" ):
            return 16
-
-
 
     def getSolutions(self):
         counter = 0
@@ -346,7 +345,7 @@ class GPUtransposeGenerator:
                    counter += 1
                    sys.stdout.write("Implementations generated so far: %d\r"%counter)
                    sys.stdout.flush()
-                   implementation = CUDAtranspose.cuda_transpose(self.size,self.perm,loopPerm, self.floatTypeA,blocking,vectorLength,self.beta,self.lda,self.ldb)
+                   implementation = CUDAtranspose.cuda_transpose(self.size,self.perm,loopPerm, self.floatTypeA,self.floatTypeB,blocking,vectorLength,self.beta,self.lda,self.ldb)
 
                    if( len(self.implementations) < self.maxNumImplementations ):
                        self.implementations.append(implementation)
@@ -394,31 +393,31 @@ class GPUtransposeGenerator:
         code +="   printf(\"\\n\");\n"
         code +="}\n"
 
-        hppCode +="void restore(const %s *in, %s*out, int total_size);\n"%(self.floatTypeA,self.floatTypeA)
-        code +="void restore(const %s *in, %s*out, int total_size)"%(self.floatTypeA,self.floatTypeA)
+        hppCode +="void restore(const %s *in, %s*out, int total_size);\n"%(self.floatTypeB,self.floatTypeB)
+        code +="void restore(const %s *in, %s*out, int total_size)"%(self.floatTypeB,self.floatTypeB)
         code +="{\n"
         code +="   for(int i=0;i < total_size ; ++i){\n"
         code +="      out[i] = in[i];\n"
         code +="   }\n"
         code +="}\n"
 
-        hppCode +="int equal(const %s *A, const %s*B, int total_size);\n"%(self.floatTypeA,self.floatTypeA)
-        code +="int equal(const %s *A, const %s*B, int total_size)"%(self.floatTypeA,self.floatTypeA)
+        hppCode +="int equal(const %s *A, const %s*B, int total_size);\n"%(self.floatTypeB,self.floatTypeB)
+        code +="int equal(const %s *A, const %s*B, int total_size)"%(self.floatTypeB,self.floatTypeB)
         code +="{\n"
         code +="   int error = 0;\n"
-        _floatType = self.floatTypeA
-        if( self.floatTypeA == "cuFloatComplex" ):
+        _floatType = self.floatTypeB
+        if( self.floatTypeB == "cuFloatComplex" ):
             _floatType = "float"
-        if( self.floatTypeA == "cuDoubleComplex" ):
+        if( self.floatTypeB == "cuDoubleComplex" ):
              _floatType = "double"
 
-        if(self.floatTypeA == "cuFloatComplex" or self.floatTypeA == "cuDoubleComplex"):
+        if(self.floatTypeB == "cuFloatComplex" or self.floatTypeB == "cuDoubleComplex"):
             code +="   const %s *Atmp = (%s*)A;\n"%(_floatType,_floatType)
             code +="   const %s *Btmp= (%s*)B;\n"%(_floatType,_floatType)
             code +="   for(int i=0;i < 2*total_size ; ++i){\n"
         else:
-            code +="   const %s *Atmp= A;\n"%self.floatTypeA
-            code +="   const %s *Btmp= B;\n"%self.floatTypeA
+            code +="   const %s *Atmp= A;\n"%self.floatTypeB
+            code +="   const %s *Btmp= B;\n"%self.floatTypeB
             code +="   for(int i=0;i < total_size ; ++i){\n"
 
         code +="      %s Aabs = (Atmp[i] < 0) ? -Atmp[i] : Atmp[i];\n"%(_floatType)
@@ -479,29 +478,49 @@ class GPUtransposeGenerator:
         code +="   int dim = %d;\n"%self.dim
 
         line = "   int size[] = {"
-        totalSize = 1
         for i in range(self.dim):
             line += str(self.size[i])
             if i != self.dim -1:
                 line += ","
-            totalSize *= self.size[i]
         line += "};\n"
         code +=line
 
+        maxSizeA = 1
+        if( len(self.lda) == 0):
+            for s in self.size:
+                maxSizeA *= s
+        else:
+            for s in self.lda:
+                maxSizeA *= s
+
         line = "   int lda[] = {"
-        totalSize = 1
         for i in range(self.dim):
             line += str(self.lda[i])
             if i != self.dim -1:
                 line += ","
-            totalSize *= self.lda[i]
         line += "};\n"
         code +=line
 
-        maxSize = max(self.lda[-1] * self.size[-1], self.ldb[-1] * self.size[self.perm[-1]])
+        maxSizeB = 1
+        if( len(self.ldb) == 0):
+            for s in self.size:
+                maxSizeB *= s
+        else:
+            for s in self.ldb:
+                maxSizeB *= s
+
+        line = "   int ldb[] = {"
+        for i in range(self.dim):
+            line += str(self.ldb[i])
+            if i != self.dim -1:
+                line += ","
+        line += "};\n"
+        code +=line
+
+
+        maxSize = max(maxSizeA, maxSizeB)
         code +="   int total_size = %d;\n"%(maxSize)
         code +="   int elements_moved = 1;\n"
-        code +="\n"
         code +="   //compute total size\n"
         code +="   for(int i=0;i < dim; ++i){\n"
         code +="      elements_moved *= size[i];\n"
@@ -511,33 +530,30 @@ class GPUtransposeGenerator:
         for implementation in self.implementations:
             maxNumBlocks = max(implementation.getNumBlocks(), maxNumBlocks)
 
-        code +="   %s *A, *B, *B_ref, *B_copy;\n"%(self.floatTypeA)
+        code +="   %s *A;\n"%(self.floatTypeA)
+        code +="   %s *B, *B_ref, *B_copy;\n"%(self.floatTypeB)
         code +="   double time;\n"
-        if( self.floatTypeA.find("double") != -1 ):
-            code +="   const double alpha = %f;\n"%(self.alpha)
-            code +="   const double beta = %f;\n"%(self.beta)
-        else:
-            code +="   const float alpha = %f;\n"%(self.alpha)
-            code +="   const float beta = %f;\n"%(self.beta)
+        code +="   const %s alpha = %f;\n"%(self.alphaFloatType,self.alpha)
+        code +="   const %s beta = %f;\n"%(self.betaFloatType,self.beta)
 
         code +="   A = (%s *) malloc(total_size * sizeof(%s));\n"%(self.floatTypeA,self.floatTypeA)
-        code +="   B_ref = (%s *) malloc(total_size * sizeof(%s));\n"%(self.floatTypeA,self.floatTypeA)
-        code +="   B_copy = (%s *) malloc(total_size * sizeof(%s));\n"%(self.floatTypeA,self.floatTypeA)
-        code +="   B = (%s *) malloc(total_size * sizeof(%s));\n"%(self.floatTypeA,self.floatTypeA)
+        code +="   B_ref = (%s *) malloc(total_size * sizeof(%s));\n"%(self.floatTypeB,self.floatTypeB)
+        code +="   B_copy = (%s *) malloc(total_size * sizeof(%s));\n"%(self.floatTypeB,self.floatTypeB)
+        code +="   B = (%s *) malloc(total_size * sizeof(%s));\n"%(self.floatTypeB,self.floatTypeB)
 
         code +="   %s *A_const = A;\n"%(self.floatTypeA)
-        code +="   const %s *B_copy_const = B_copy;\n"%(self.floatTypeA)
+        code +="   const %s *B_copy_const = B_copy;\n"%(self.floatTypeB)
         code +="\n"
         if (self.floatTypeA == "cuFloatComplex"):
             tmpType = "float"
         if (self.floatTypeA == "cuDoubleComplex"):
             tmpType = "double"
         if(self.floatTypeA == "cuFloatComplex" or self.floatTypeA == "cuDoubleComplex"):
-            code +="   %s *Atmp = (%s*) A;\n"%(tmpType,tmpType)
-            code +="   %s *Btmp = (%s*) B;\n"%(tmpType,tmpType)
+            code +="   %s *Atmp = (%s*) A;\n"%(self.alphaFloatType,self.alphaFloatType)
+            code +="   %s *Btmp = (%s*) B;\n"%(self.betaFloatType,self.betaFloatType)
             code +="   for(int i=0;i < 2*total_size ; ++i){\n"
-            code +="      Atmp[i] = (%s)i;\n"%(tmpType)
-            code +="      Btmp[i] = (%s)i;\n"%(tmpType)
+            code +="      Atmp[i] = (%s)i;\n"%(self.alphaFloatType)
+            code +="      Btmp[i] = (%s)i;\n"%(self.betaFloatType)
             code +="   }\n"
             code +="   for(int i=0;i < total_size ; ++i){\n"
             code +="      B_ref[i] = B[i];\n"
@@ -547,7 +563,7 @@ class GPUtransposeGenerator:
         else:
             code +="   for(int i=0;i < total_size ; ++i){\n"
             code +="      A[i] = (%s)i;\n"%(self.floatTypeA)
-            code +="      B[i] = (%s)i;\n"%(self.floatTypeA)
+            code +="      B[i] = (%s)i;\n"%(self.floatTypeB)
             code +="      B_ref[i] = B[i];\n"
             code +="      B_copy[i] = B[i];\n"
             code +="   }\n"
@@ -558,9 +574,9 @@ class GPUtransposeGenerator:
         code +="   double referenceBandwidth = 0;\n"
         if( self.noTest == 0 ):
             if(self.beta != 0 ):
-                code +="   %s(A_const, B_ref, size, alpha, beta);\n"%self.referenceImplementation.getReferenceHeader()
+                code +="   %s(A_const, B_ref, size, alpha, beta, lda, ldb);\n"%self.referenceImplementation.getReferenceHeader()
             else:
-                code +="   %s(A_const, B_ref, size, alpha);\n"%self.referenceImplementation.getReferenceHeader()
+                code +="   %s(A_const, B_ref, size, alpha, lda, ldb);\n"%self.referenceImplementation.getReferenceHeader()
 
         versionStr = self.referenceImplementation.getReferenceHeader()
         #time reference version
@@ -573,16 +589,16 @@ class GPUtransposeGenerator:
             code +="            restore(B_copy_const, B, total_size);\n"
         code +="         start = omp_get_wtime();\n"
         if(self.beta != 0 ):
-            code +="         %s(A_const, B, size, alpha, beta);\n"%versionStr
+            code +="         %s(A_const, B, size, alpha, beta, lda, ldb);\n"%versionStr
         else:
-            code +="         %s(A_const, B, size, alpha);\n"%versionStr
+            code +="         %s(A_const, B, size, alpha, lda, ldb);\n"%versionStr
         code +="         double tmpTime = omp_get_wtime() - start;\n"
         code +="         if( tmpTime < time ) time = tmpTime;\n"
         code +="      }\n"
         if self.beta != 0:
-            code +="      double bandwidth = 3. * ((double)(elements_moved * sizeof("+self.floatTypeA+")))/(1<<30)/(time);\n"
+            code +="      double bandwidth = ((double)(elements_moved * (sizeof("+self.floatTypeA+") + 2.0 * sizeof("+self.floatTypeB+"))))/(1<<30)/(time);\n"
         else:
-            code +="      double bandwidth = 2. * ((double)(elements_moved * sizeof("+self.floatTypeA+")))/(1<<30)/(time);\n"
+            code +="     double bandwidth = ((double)(elements_moved * (sizeof("+self.floatTypeA+") + 1.0 * sizeof("+self.floatTypeB+"))))/(1<<30)/(time);\n"
         code +="      referenceBandwidth = bandwidth;\n"
         code +="      printf(\"The reference version took %f and achieved %.2f GB/s \\n\",time, bandwidth);\n"
         code +="      fflush(stdout);\n"
@@ -604,15 +620,13 @@ class GPUtransposeGenerator:
         #split measurement into several files
         measureHPP = ""
         for i in range(numFiles):
-            code += "   tmpBandwidth = measure%d(nRepeat, argc, argv, A_const, B, B_copy_const, B_ref, alpha, beta, total_size,elements_moved, size);\n"%(i)
+            code += "   tmpBandwidth = measure%d(nRepeat, argc, argv, A_const, B, B_copy_const, B_ref, alpha, beta, total_size,elements_moved, size,lda,ldb);\n"%(i)
             code += "   maxBandwidth = (tmpBandwidth < maxBandwidth) ? maxBandwidth : tmpBandwidth;\n"
 
             tmpCode = "#include \"util.h\"\n"
             tmpCode += "#include \"transpose.h\"\n\n"
  
-            alphaFloatType = "float"
-            if( self.floatTypeA.find("double") != -1 ):
-                alphaFloatType = "double"
+
             header = """double measure%d(int nRepeat,
                 int argc, char** argv,
                 %s *A_const,
@@ -623,15 +637,19 @@ class GPUtransposeGenerator:
                 const %s beta,
                 int total_size,
                 int elements_moved,
-                int *size)\n"""%(i,self.floatTypeA,self.floatTypeA,self.floatTypeA,self.floatTypeA,alphaFloatType , alphaFloatType)
+                int *size, int *lda, int *ldb)\n"""%(i,self.floatTypeA,self.floatTypeB,self.floatTypeB,self.floatTypeB,self.alphaFloatType , self.betaFloatType)
             tmpCode +=  header + "{\n\n"
             measureHPP += header + ";\n"
             tmpCode += "    double maxBandwidth = -1;\n"
-	    tmpCode += "    %s *d_A, *d_B;\n\n"%(self.floatTypeA)
+
+	    tmpCode += "    %s *d_A;\n"%(self.floatTypeA)
+	    tmpCode += "    %s *d_B;\n\n"%(self.floatTypeB)
+
 	    tmpCode += "    cudaMalloc(&d_A,total_size*sizeof(%s));\n"%(self.floatTypeA)
             tmpCode +=  ttc_util.getCudaErrorChecking("    ", "measure%d"%i)
-	    tmpCode += "    cudaMalloc(&d_B,total_size*sizeof(%s));\n"%(self.floatTypeA)
+	    tmpCode += "    cudaMalloc(&d_B,total_size*sizeof(%s));\n"%(self.floatTypeB)
             tmpCode +=  ttc_util.getCudaErrorChecking("    ", "measure%d"%i)
+
 	    tmpCode += "    cudaMemcpy(d_A, A_const,total_size*sizeof(%s), cudaMemcpyHostToDevice);\n\n"%(self.floatTypeA)
             tmpCode +=  ttc_util.getCudaErrorChecking("    ", "measure%d"%i)
             for j in range(i * numSolutionsPerFile, min(numImplementations,(i+1)*numSolutionsPerFile)):
@@ -646,19 +664,19 @@ class GPUtransposeGenerator:
                 if( self.noTest == 0 ):
                     tmpCode +="           if( i == 0 ){\n"
                     tmpCode +="               restore(B_copy_const, B, total_size);\n"
-                    tmpCode +="                cudaMemcpy(d_B, B,total_size*sizeof(%s), cudaMemcpyHostToDevice);\n"%(self.floatTypeA) 	      
+                    tmpCode +="                cudaMemcpy(d_B, B,total_size*sizeof(%s), cudaMemcpyHostToDevice);\n"%(self.floatTypeB) 	      
                     tmpCode +=  ttc_util.getCudaErrorChecking("               ", transposeName)
                     tmpCode +="            }\n"
                 tmpCode +="        double start, tmpTime;\n"
                 tmpCode +="        start = omp_get_wtime();\n"
                 if(self.beta != 0):
-                    tmpCode +="        %s(d_A, d_B, alpha, beta);\n"%transposeName
+                    tmpCode +="        %s(d_A, d_B, alpha, beta,size, lda, ldb);\n"%transposeName
                 else:
-                    tmpCode +="        %s(d_A, d_B, alpha);\n"%transposeName
+                    tmpCode +="        %s(d_A, d_B, alpha, size, lda, ldb);\n"%transposeName
                 tmpCode +="        tmpTime = omp_get_wtime() - start;\n\n"
                 tmpCode +=  ttc_util.getCudaErrorChecking("        ", transposeName)
                 tmpCode +="        if( i == 0 )\n"
-		tmpCode +="           cudaMemcpy(B, d_B,total_size*sizeof(%s), cudaMemcpyDeviceToHost);\n\n"%(self.floatTypeA) 
+		tmpCode +="           cudaMemcpy(B, d_B,total_size*sizeof(%s), cudaMemcpyDeviceToHost);\n\n"%(self.floatTypeB) 
                 tmpCode +=  ttc_util.getCudaErrorChecking("        ", transposeName)
                 tmpCode +="        if( tmpTime < time ) time = tmpTime;\n"
                 if( self.noTest == 0 ):
@@ -669,9 +687,9 @@ class GPUtransposeGenerator:
                     tmpCode +="        }\n"
                 tmpCode +="    }\n"
                 if self.beta != 0:
-                    tmpCode +="      double bandwidth = 3. * ((double)(elements_moved * sizeof("+self.floatTypeA+")))/(1<<30)/(time);\n"
+                    tmpCode +="      double bandwidth = ((double)(elements_moved * (sizeof("+self.floatTypeA+") + 2.0 * sizeof("+self.floatTypeB+"))))/(1<<30)/(time);\n"
                 else:
-                    tmpCode +="      double bandwidth = 2. * ((double)(elements_moved * sizeof("+self.floatTypeA+")))/(1<<30)/(time);\n"
+                    tmpCode +="      double bandwidth = ((double)(elements_moved * (sizeof("+self.floatTypeA+") + 1.0 * sizeof("+self.floatTypeB+"))))/(1<<30)/(time);\n"
                 tmpCode +="      if( bandwidth > maxBandwidth ) maxBandwidth = bandwidth;\n"
 
                 tmpCode +="      printf(\"variant "+versionStr+" took %f and achieved %.2f GB/s (theoretical cost: 10) (tlb misses: 0) (l2 misses: 0.000000) (invalidates: 0.000000)\\n\",time, bandwidth);\n"
@@ -714,18 +732,18 @@ class GPUtransposeGenerator:
         hppCode += "void " + self.referenceImplementation.getReferenceHeader(1) + ";\n"
 
 	for v in self.vectorLength:
-	    cudaTranspose = CUDAtranspose.cuda_transpose(self.size,self.perm,self.loopPermutations[0], self.floatTypeA,self.blockings[0],v,self.beta,self.lda,self.ldb)
+	    cudaTranspose = CUDAtranspose.cuda_transpose(self.size,self.perm,self.loopPermutations[0], self.floatTypeA,self.floatTypeB,self.blockings[0],v,self.beta,self.lda,self.ldb)
 	    cudaCode = "#include <cuda_runtime.h>\n"
-	    cudaCode = "#include <stdio.h>\n"
+	    cudaCode += "#include <stdio.h>\n"
 	    cudaCode += "#include <cuComplex.h>\n"
             ##code = "#include <complex.h>\n\n"
             if(self.perm[0] != 0):
                 cudaCode += cudaTranspose.getSharedTransposeKernel()
-                if(self.remainderA != 0 or self.remainderB != 0):
-	            cudaCode += cudaTranspose.getRemainderTransposeKernel(32)
+                #if(self.remainderA != 0 or self.remainderB != 0):
+	        cudaCode += cudaTranspose.getRemainderTransposeKernel(32)
 	    for b in self.blockings:
 	        for l in self.loopPermutations:
-		     cudaTranspose = CUDAtranspose.cuda_transpose(self.size,self.perm,l, self.floatTypeA,b,v,self.beta, self.lda,self.ldb)       
+		     cudaTranspose = CUDAtranspose.cuda_transpose(self.size,self.perm,l, self.floatTypeA,self.floatTypeB,b,v,self.beta, self.lda,self.ldb)       
 	             cudaCode += "\n//**********************************************************************\n\n" + cudaTranspose.getCudaImplementation()
                      cudaCode += cudaTranspose.getHostCall()
 		     hppCode += cudaTranspose.getCudaTransposeHeader(0) + ";\n"

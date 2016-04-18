@@ -619,7 +619,7 @@ def generateTransposition( ttcArgs ):
 
     compiler_version = ttc_util.getCompilerVersion(ttcArgs.compiler)
 
-    if( ttcArgs.architecture != "avx" and ttcArgs.floatTypeA != ttcArgs.floatTypeB):
+    if( ttcArgs.architecture != "cuda" and ttcArgs.architecture != "avx" and ttcArgs.floatTypeA != ttcArgs.floatTypeB):
         print FAIL + "[TTC] ERROR: Mixed precision is currently only supported for avx-enabled processors." + ENDC
         exit(-1)
     if( (ttcArgs.architecture == "knc" or ttcArgs.architecture == "avx512" or ttcArgs.architecture == "power") and ttcArgs.floatTypeA != "float"):

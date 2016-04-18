@@ -3,23 +3,33 @@ import math
 import ttc_util
 
 class cuda_transpose:
-    def __init__(self,size,perm,loopPerm, floatType,blocking, vectorLength,isBeta,lda,ldb):
+    def __init__(self,size,perm,loopPerm, floatTypeA, floatTypeB, blocking, vectorLength,isBeta,lda,ldb):
 
 
        self.size = copy.deepcopy(size)
 
        self.perm = copy.deepcopy(perm)
        self.loopPerm = copy.deepcopy(loopPerm)
-       self.floatType = floatType
+
+       self.floatTypeA = floatTypeA
+       self.floatTypeB = floatTypeB
+
+
        self.blocking = list(copy.deepcopy(blocking));
        self.vectorLength = vectorLength
-       self.isBeta = isBeta		
+       self.isBeta = isBeta
+		
        self.alphaFloatType = "float"
-       if( self.floatType.find("double") != -1 ):
+       if( self.floatTypeA.find("double") != -1 ):
+            self.alphaFloatType = "double"
+       if(self.floatTypeA == "cuDoubleComplex"):
             self.alphaFloatType = "double"
 
-       if(self.floatType == "cuDoubleComplex"):
-            self.alphaFloatType = "double"
+       self.betaFloatType = "float"
+       if( self.floatTypeB.find("double") != -1 ):
+            self.betaFloatType = "double"
+       if(self.floatTypeB == "cuDoubleComplex"):
+            self.betaFloatType = "double"
 
        self.matCopy = 0
        count = 0
@@ -57,22 +67,23 @@ class cuda_transpose:
        self.remainderIndexA = -1
        self.remainderIndexB = -1
        if(self.perm[0] != 0): 
-           if(self.remainderA != 0):
-               self.remainderIndexA = 0  
-           if(self.remainderB != 0):
-               self.remainderIndexB = self.perm[0]
-       else:  
-           if(self.remainderA != 0):
-               self.remainderIndexA = 1
-           if(self.remainderB != 0):
-               self.remainderIndexB = self.perm[1]
+           #if(self.remainderA != 0):
+           self.remainderIndexA = 0  
+           #if(self.remainderB != 0):
+           self.remainderIndexB = self.perm[0]
+       elif(self.matCopy == 0):  
+           #if(self.remainderA != 0):
+           self.remainderIndexA = 1
+           #if(self.remainderB != 0):
+           self.remainderIndexB = self.perm[1]
+
            
 
        self.reminderIntersect = 0	
        self.remainderIntersectIndex = -1
-       if(self.remainderA !=0 and self.remainderB != 0):
-	   self.remainderIntersectIndex = self.remainderIndexB
-	   self.remainderIntersect = self.remainderB	
+       #if(self.remainderA !=0 and self.remainderB != 0):
+       self.remainderIntersectIndex = self.remainderIndexB
+       self.remainderIntersect = self.remainderB	
 
        #compute leading dimensions
        self.lda = copy.deepcopy(lda)
@@ -100,91 +111,59 @@ class cuda_transpose:
 	 
 
 
-    def getCudaImplementation(self):
+    def getCudaImplementation(self,fastestVersion=0):
 	code = ""
-	code += self.getCudaTransposeHeader()
+	code += self.getCudaTransposeHeader(1,fastestVersion)
 	code += "\n{\n"
 	code += "//loopPerm = [ %s ]\n\n"%(self.getloopPermVersion())
 	code += "   const int blockA = " + str(self.blocking[0]) + ";\n"
 	code += "   const int blockB = " + str(self.blocking[1]) + ";\n"
 	code += self.declareVariables()
 	if(self.perm[0]!=0):
-	    code +="    __shared__ %s tile[32][33];\n\n"%(self.floatType)
+	    code +="    __shared__ %s tile[32][33];\n\n"%(self.floatTypeA)
 	    code += self.getIndices(self.loopPerm, self.blocking[0],self.blocking[1])
-	    code +="   const %s *Atmp = &A[%s];\n"%(self.floatType,self.getOffsetA())
-	    code +="   %s *Btmp = &B[%s];\n"%(self.floatType,self.getOffsetB())
-	    code +="   const %s *Aref = &A[%s];\n"%(self.floatType,self.getOffsetA())
-	    code +="   %s *Bref = &B[%s];\n"%(self.floatType,self.getOffsetB())	
-	    code +="   int lda = lda%d;\n"%(self.perm[0])
-	    code +="   int ldb = ldb%d;\n"%(self.ldout)
-	    if(self.remainderA == 0 and self.remainderB == 0):
-                code += self.generateBlockedCode(self.blocking)
-	    elif(self.remainderA != 0 and self.remainderB != 0):
-	        code +="   if(i%d < %d && i%d < %d)\n"%(self.remainderIndexA, self.size[self.remainderIndexA] - self.remainderA ,self.remainderIndexB, self.size[self.remainderIndexB] - self.remainderB )
-	        code +="   {"
-                code += self.generateBlockedCode(self.blocking)
-	        code +="   }\n"
-	        code +="   else if(i%d >= %d && i%d < %d)\n"%(self.remainderIndexA,  self.size[self.remainderIndexA] - self.remainderA,self.remainderIndexB, self.size[self.remainderIndexB] - self.remainderB)
-	        code +="   { //remainder in size%d\n"%(self.remainderIndexA)
-                if(self.rem64 == 0): 
-	           if(self.isBeta):
-	    	       code +="       %s(Atmp,Btmp,alpha,beta,lda,ldb,remainder%d, 32,tile);\n"%(self.getRemainderKernelHeader(), self.remainderIndexA)
-	           else:
-	    	       code +="       %s(Atmp,Btmp,alpha,lda,ldb,remainder%d, 32,tile);\n"%(self.getRemainderKernelHeader(), self.remainderIndexA)
-		else:
-		   code +=self.getRemainder64()
-	        code +="   }\n"
-                code +="   else if(i%d >= %d && i%d < %d)\n"%(self.remainderIndexB,  self.size[self.remainderIndexB] - self.remainderB,self.remainderIndexA, self.size[self.remainderIndexA] - self.remainderA)
-	        code +="   { //remainder in size%d\n"%(self.remainderIndexB)
-                if(self.rem64 == 0):
-	           if(self.isBeta):
-	    	        code +="       %s(Atmp,Btmp,alpha,beta,lda,ldb,32,remainder%d,tile);\n"%(self.getRemainderKernelHeader(), self.remainderIndexB)
-	           else:
-	    	        code +="       %s(Atmp,Btmp,alpha,lda,ldb,32,remainder%d,tile);\n"%(self.getRemainderKernelHeader(), self.remainderIndexB)
-		else:
-		   code +=self.getRemainder64()
-	        code +="   }\n"
-	        code +="   else\n"
-                if(self.rem64 == 0):
-	           if(self.isBeta):
-	    	       code +="       %s(Atmp,Btmp,alpha,beta,lda,ldb,remainder%d,remainder%d,tile);\n"%(self.getRemainderKernelHeader(), self.remainderIndexA, self.remainderIndexB)
-	           else:
-	    	       code +="       %s(Atmp,Btmp,alpha,lda,ldb,remainder%d,remainder%d,tile);\n"%(self.getRemainderKernelHeader(),self.remainderIndexA ,self.remainderIndexB)
-		else:
-		   code +="   {\n"
-		   code +=self.getRemainder64()
-		   code +="   }\n"	 
+	    code +="   const %s *Atmp = &A[%s];\n"%(self.floatTypeA,self.getOffsetA())
+	    code +="   %s *Btmp = &B[%s];\n"%(self.floatTypeB,self.getOffsetB())
+	    code +="   const %s *Aref = &A[%s];\n"%(self.floatTypeA,self.getOffsetA())
+	    code +="   %s *Bref = &B[%s];\n"%(self.floatTypeB,self.getOffsetB())	
+	    code +="   int lda_kernel = lda%d;\n"%(self.perm[0])
+	    code +="   int ldb_kernel = ldb%d;\n"%(self.ldout)
+	    
+	    code +="   if(i%d < (size%d-remainder%d) && i%d < (size%d-remainder%d))\n"%(self.remainderIndexA, self.remainderIndexA, self.remainderIndexA ,self.remainderIndexB, self.remainderIndexB, self.remainderIndexB)
+	    code +="   {"
+            code += self.generateBlockedCode(self.blocking)
+	    code +="   }\n"
+	    code +="   else if(i%d >= (size%d-remainder%d) && i%d < (size%d-remainder%d))\n"%(self.remainderIndexA,  self.remainderIndexA ,self.remainderIndexA , self.remainderIndexB, self.remainderIndexB, self.remainderIndexB)
+	    code +="   { //remainder in size%d\n"%(self.remainderIndexA)
+            if(self.rem64 == 0): 
+	       if(self.isBeta):
+	    	   code +="       %s(Atmp,Btmp,alpha,beta,lda_kernel,ldb_kernel,remainder%d, 32,tile);\n"%(self.getRemainderKernelHeader(), self.remainderIndexA)
+	       else:
+	    	   code +="       %s(Atmp,Btmp,alpha,lda_kernel,ldb_kernel,remainder%d, 32,tile);\n"%(self.getRemainderKernelHeader(), self.remainderIndexA)
+            else:
+	       code +=self.getRemainder64()
+	    code +="   }\n"
+            code +="   else if(i%d >= (size%d-remainder%d) && i%d < (size%d-remainder%d))\n"%(self.remainderIndexB, self.remainderIndexB,self.remainderIndexB ,self.remainderIndexA, self.remainderIndexA, self.remainderIndexA)
+	    code +="   { //remainder in size%d\n"%(self.remainderIndexB)
+            if(self.rem64 == 0):
+	       if(self.isBeta):
+	    	    code +="       %s(Atmp,Btmp,alpha,beta,lda_kernel,ldb_kernel,32,remainder%d,tile);\n"%(self.getRemainderKernelHeader(), self.remainderIndexB)
+	       else:
+	    	    code +="       %s(Atmp,Btmp,alpha,lda_kernel,ldb_kernel,32,remainder%d,tile);\n"%(self.getRemainderKernelHeader(), self.remainderIndexB)
+	    else:
+	       code +=self.getRemainder64()
+	    code +="   }\n"
+	    code +="   else\n"
+            if(self.rem64 == 0):
+	       if(self.isBeta):
+	    	   code +="       %s(Atmp,Btmp,alpha,beta,lda_kernel,ldb_kernel,remainder%d,remainder%d,tile);\n"%(self.getRemainderKernelHeader(), self.remainderIndexA, self.remainderIndexB)
+	       else:
+	    	   code +="       %s(Atmp,Btmp,alpha,lda_kernel,ldb_kernel,remainder%d,remainder%d,tile);\n"%(self.getRemainderKernelHeader(),self.remainderIndexA ,self.remainderIndexB)
+            else:
+	       code +="   {\n"
+	       code +=self.getRemainder64()
+	       code +="   }\n"	 
 	              
-            elif(self.remainderA != 0):
-	        code +="   if(i%d < %d)\n"%(self.remainderIndexA, self.size[self.remainderIndexA] - self.remainderA)
-	        code +="   {\n"
-                code += self.generateBlockedCode(self.blocking)
-	        code +="   }\n"
-	        code +="   else\n"
-                code +="   { //remainder in size%d\n"%(self.remainderIndexA)
-                if(self.rem64 == 0):
-	           if(self.isBeta):
-	    	       code +="       %s(Atmp,Btmp,alpha,beta,lda,ldb,remainder%d,32,tile);\n"%(self.getRemainderKernelHeader(), self.remainderIndexA)
-	           else:
-	    	       code +="       %s(Atmp,Btmp,alpha,lda,ldb,remainder%d,32,tile);\n"%(self.getRemainderKernelHeader(), self.remainderIndexA)
-                else:
-		   code += self.getRemainder64()	 
- 	        code +="   }\n"
-            elif(self.remainderB != 0):
-	        code +="   if(i%d < %d)\n"%(self.remainderIndexB, self.size[self.remainderIndexB] - self.remainderB)
-	        code +="   {\n"
-                code += self.generateBlockedCode(self.blocking)
-	        code +="   }\n"
-	        code +="   else\n"
-                code +="   { //remainder in size%d\n"%(self.remainderIndexB)
-                if(self.rem64 == 0):
-	           if(self.isBeta):
-	    	       code +="       %s(Atmp,Btmp,alpha,beta,lda,ldb,32,remainder%d,tile);\n"%(self.getRemainderKernelHeader(), self.remainderIndexB)
-	           else:
-	    	       code +="       %s(Atmp,Btmp,alpha,lda,ldb,32,remainder%d,tile);\n"%(self.getRemainderKernelHeader(), self.remainderIndexB)
-		else:
-		   code +=self.getRemainder64() 	        
-		code +="   }\n"
 	elif(self.matCopy == 0):
             code += self.getIndices(self.loopPerm, self.blocking[0],self.blocking[1])
 	    code += self.getPerm0Loop()
@@ -207,8 +186,8 @@ class cuda_transpose:
 		code += "      for(int j=j0; j<blockB; j=j+%d)\n"%jump
 		code += "      {\n"
 		code += "         int i0 = threadIdx.x % size0;\n"
-                if(self.remainderA !=0 or self.remainderB !=0):
-		    code += "           if((i1+i*nba) < size1 && (i%d+j*nbb) < size%d)\n"%(self.perm[1],self.perm[1])
+                #if(self.remainderA !=0 or self.remainderB !=0):
+		code += "           if((i1+i*nba) < size1 && (i%d+j*nbb) < size%d)\n"%(self.perm[1],self.perm[1])
                 code += self.getUpdateString("              ") 
 		code +="        }\n"
 	    
@@ -221,8 +200,8 @@ class cuda_transpose:
 		code += "         for(int j=j0; j<blockB; j=j+%d)\n"%(jump)
 		code += "         {\n"
 		code += "              int i0 = threadIdx.x % size0;\n"
-                if(self.remainderA !=0 or self.remainderB !=0):
-		    code += "          if((i1+i*nba) < size1 && (i%d+j*nbb) < size%d)\n"%(self.perm[1],self.perm[1])
+                #if(self.remainderA !=0 or self.remainderB !=0):
+		code += "          if((i1+i*nba) < size1 && (i%d+j*nbb) < size%d)\n"%(self.perm[1],self.perm[1])
                 code += self.getUpdateString("              ") 
 		code += "         }\n"
 	        code += "   }\n"
@@ -232,10 +211,10 @@ class cuda_transpose:
 		code += "      for(int j=0; j<blockB; j++)\n"
 	        code += "      {\n"
 		code += "         int i0 = threadIdx.x;\n"
-                if(self.remainderA !=0 or self.remainderB !=0):
-		    code += "         if(i0 < size0 && (i1+i*nba) < size1 && (i%d+j*nbb) < size%d)\n"%(self.perm[1],self.perm[1])
-                else:
-		    code += "         if(i0 < size0)\n"
+                #if(self.remainderA !=0 or self.remainderB !=0):
+		code += "         if(i0 < size0 && (i1+i*nba) < size1 && (i%d+j*nbb) < size%d)\n"%(self.perm[1],self.perm[1])
+                #else:
+		#    code += "         if(i0 < size0)\n"
                 code += self.getUpdateString("              ") 
 		code +="       }\n"
 
@@ -244,8 +223,8 @@ class cuda_transpose:
 	    code += "      for(int j=0; j<blockB; j++)\n"
 	    code += "         for(int i0=threadIdx.x; i0<size0; i0=i0+%d)\n"%self.vectorLength
 	    code += "         {\n" 	
-            if(self.remainderA !=0 or self.remainderB !=0):
-		code += "             if(i0 < size0 && (i1+i*nba) < size1 && (i%d+j*nbb) < size%d)\n"%(self.perm[1],self.perm[1])
+            #if(self.remainderA !=0 or self.remainderB !=0):
+	    code += "             if(i0 < size0 && (i1+i*nba) < size1 && (i%d+j*nbb) < size%d)\n"%(self.perm[1],self.perm[1])
             code += self.getUpdateString("              ") 
 
 	    code += "         }\n"
@@ -255,8 +234,8 @@ class cuda_transpose:
 	    code += "      for(int j=0; j<blockB; j++)\n"
 	    code += "      {\n"
 	    code += "         int i0 = threadIdx.x;\n"
-            if(self.remainderA !=0 or self.remainderB !=0):
-		code += "        if(i0 < size0 && (i1+i*nba) < size1 && (i%d+j*nbb) < size%d)\n"%(self.perm[1],self.perm[1])
+            #if(self.remainderA !=0 or self.remainderB !=0):
+	    code += "        if(i0 < size0 && (i1+i*nba) < size1 && (i%d+j*nbb) < size%d)\n"%(self.perm[1],self.perm[1])
             code += self.getUpdateString("              ")  	 
 
 	    code += "      }\n"
@@ -283,24 +262,24 @@ class cuda_transpose:
                      offsetA = ""
                      offsetB = ""
                   else:
-                     offsetA = " + %d * lda"%(j *self.tiling[0])
+                     offsetA = " + %d * lda_kernel"%(j *self.tiling[0])
                      offsetB = " + %d"%(j *self.tiling[1])
                else:
                   if( j == 0):
                      offsetA =" + %d"%(i *self.tiling[0])
-                     offsetB =" + %d * ldb"%(i *self.tiling[1])
+                     offsetB =" + %d * ldb_kernel"%(i *self.tiling[1])
                   else:
-                     offsetA = " + %d + %d * lda"%(i * self.tiling[0],j * self.tiling[0])
-                     offsetB = " + %d + %d * ldb"%(j * self.tiling[1],i * self.tiling[1])
+                     offsetA = " + %d + %d * lda_kernel"%(i * self.tiling[0],j * self.tiling[0])
+                     offsetB = " + %d + %d * ldb_kernel"%(j * self.tiling[1],i * self.tiling[1])
 
                code +="\n     //offset\n"
                code +="      Atmp = Aref %s;\n"%(offsetA)
                code +="      Btmp = Bref %s;\n\n"%(offsetB)
                #code +="  // if(blockIdx.x < %d )\n"%(self.getNumBlocks())
                if(self.isBeta):
-                   code +="      cuSharedMemTranspose_vec%d(Atmp,Btmp,alpha,beta,lda,ldb,tile);\n"%(self.vectorLength)
+                   code +="      cuSharedMemTranspose_vec%d(Atmp,Btmp,alpha,beta,lda_kernel,ldb_kernel,tile);\n"%(self.vectorLength)
                else: 
-                   code +="      cuSharedMemTranspose_vec%d(Atmp,Btmp,alpha,lda,ldb,tile);\n"%(self.vectorLength)
+                   code +="      cuSharedMemTranspose_vec%d(Atmp,Btmp,alpha,lda_kernel,ldb_kernel,tile);\n"%(self.vectorLength)
 
         return code
 
@@ -312,22 +291,25 @@ class cuda_transpose:
         code +="__device__\n"
 
         if(self.isBeta):
-            code +="void cuSharedMemTranspose_vec%d(const %s *Atmp, %s *Btmp, const %s alpha, const %s beta, int lda, int ldb, %s tile[32][33])\n"%(self.vectorLength, self.floatType, self.floatType,self.alphaFloatType, self.alphaFloatType, self.floatType)
+            code +="void cuSharedMemTranspose_vec%d(const %s *Atmp, %s *Btmp, const %s alpha, const %s beta, int lda, int ldb, %s tile[32][33])\n"%(self.vectorLength, self.floatTypeA, self.floatTypeB,self.alphaFloatType, self.betaFloatType, self.floatTypeA)
         else:    
-            code +="void cuSharedMemTranspose_vec%d(const %s *Atmp, %s *Btmp, const %s alpha, int lda, int ldb, %s tile[32][33])\n"%(self.vectorLength, self.floatType, self.floatType, self.alphaFloatType, self.floatType)
+            code +="void cuSharedMemTranspose_vec%d(const %s *Atmp, %s *Btmp, const %s alpha, int lda, int ldb, %s tile[32][33])\n"%(self.vectorLength, self.floatTypeA, self.floatTypeB, self.alphaFloatType, self.floatTypeA)
         code +="{\n\n" 
         code +="   const int TILE_DIM_X = %d;\n"%(self.tiling[0])
         code +="   const int TILE_DIM_Y = %d;\n"%(self.tiling[1])
         code +="   const int THREADS_PER_ROW = %d;\n\n"%(self.vectorLength/self.tiling[0])
-        if(self.floatType == "cuFloatComplex"):
+        if(self.floatTypeA == "cuFloatComplex"):
             code +=   "%scuFloatComplex cuAlpha = make_cuFloatComplex(alpha,0.0);\n"%self.indent
+        if(self.floatTypeB == "cuFloatComplex"):
             if(self.isBeta):
                 code +=   "%scuFloatComplex cuBeta = make_cuFloatComplex(beta,0.0);\n"%self.indent
 
-        if(self.floatType == "cuDoubleComplex"):
+        if(self.floatTypeA == "cuDoubleComplex"):
             code +=   "%scuDoubleComplex cuAlpha = make_cuDoubleComplex(alpha,0.0);\n"%self.indent
+        if(self.floatTypeB == "cuDoubleComplex"):
             if(self.isBeta):
                 code +=   "%scuDoubleComplex cuBeta = make_cuDoubleComplex(beta,0.0);\n"%self.indent
+
         code +="   int id = threadIdx.x;\n"
         code +="   int rowId = id & %d;\n"%(self.tiling[1] - self.padding)
         code +="   int colId = id / TILE_DIM_X;\n\n"
@@ -346,23 +328,25 @@ class cuda_transpose:
         code +="__device__\n"
 
         if(self.isBeta):
-            code +="void %s(const %s *Atmp, %s *Btmp, const %s alpha, const %s beta, int lda, int ldb, int remainderx, int remaindery, %s tile[32][33])\n"%(self.getRemainderKernelHeader(), self.floatType, self.floatType,self.alphaFloatType, self.alphaFloatType, self.floatType)
+            code +="void %s(const %s *Atmp, %s *Btmp, const %s alpha, const %s beta, int lda, int ldb, int remainderx, int remaindery, %s tile[32][33])\n"%(self.getRemainderKernelHeader(), self.floatTypeA, self.floatTypeB,self.alphaFloatType, self.betaFloatType, self.floatTypeA)
         else:    
-            code +="void %s(const %s *Atmp, %s *Btmp, const %s alpha, int lda, int ldb, int remainderx, int remaindery, %s tile[32][33])\n"%(self.getRemainderKernelHeader(), self.floatType, self.floatType, self.alphaFloatType, self.floatType)
+            code +="void %s(const %s *Atmp, %s *Btmp, const %s alpha, int lda, int ldb, int remainderx, int remaindery, %s tile[32][33])\n"%(self.getRemainderKernelHeader(), self.floatTypeA, self.floatTypeB, self.alphaFloatType, self.floatTypeA)
         code +="{\n\n" 
         code +="   const int TILE_DIM_X = %d;\n"%(blocking)
         code +="   const int TILE_DIM_Y = %d;\n"%(blocking)
         code +="   const int THREADS_PER_ROW = %d;\n\n"%(self.vectorLength/blocking)
-        if(self.floatType == "cuFloatComplex"):
+        if(self.floatTypeA == "cuFloatComplex"):
             code +=   "%scuFloatComplex cuAlpha = make_cuFloatComplex(alpha,0.0);\n"%self.indent
+        if(self.floatTypeB == "cuFloatComplex"):
             if(self.isBeta):
                 code +=   "%scuFloatComplex cuBeta = make_cuFloatComplex(beta,0.0);\n"%self.indent
 
-        if(self.floatType == "cuDoubleComplex"):
+        if(self.floatTypeA == "cuDoubleComplex"):
             code +=   "%scuDoubleComplex cuAlpha = make_cuDoubleComplex(alpha,0.0);\n"%self.indent
+        if(self.floatTypeB == "cuDoubleComplex"):
             if(self.isBeta):
                 code +=   "%scuDoubleComplex cuBeta = make_cuDoubleComplex(beta,0.0);\n"%self.indent
-        code +="   //__shared__ %s tile[TILE_DIM_X][TILE_DIM_Y+%d];\n"%(self.floatType, self.padding)
+
         code +="   int id = threadIdx.x;\n"
         code +="   int rowId = id & %d;\n"%(blocking - self.padding)
         code +="   int colId = id / TILE_DIM_X;\n\n"
@@ -371,11 +355,11 @@ class cuda_transpose:
 	code +="      if(rowId < remainderx && j < remaindery)\n"
         code += self.getSharedMemoryUpdateString("           ", "toTile")    
 	code +="      else\n"
-        if(self.floatType == "float" or self.floatType == "double"):
+        if(self.floatTypeA == "float" or self.floatTypeA == "double"):
 	    code +="            tile[j][rowId] = 0;\n"
-        if(self.floatType == "cuFloatComplex"):
+        if(self.floatTypeA == "cuFloatComplex"):
 	    code +="            tile[j][rowId] = make_cuFloatComplex(0.0,0.0);\n"
-        if(self.floatType == "cuDoubleComplex"):
+        if(self.floatTypeA == "cuDoubleComplex"):
 	    code +="            tile[j][rowId] = make_cuDoubleComplex(0.0,0.0);\n"
 	code +="    }\n"  
         code +="   __syncthreads();\n\n"
@@ -389,34 +373,7 @@ class cuda_transpose:
 
 	return code
 
-
-    def getRemainderCode(self, remainder, remainderIndex, equal=0):
-        code =" \n\n//Remainder in size%d\n"%(remainderIndex)
-        if(equal == 0):
-            code +="   if(blockIdx.x < %d)\n"%(self.getNumRemainderBlocks(remainder,remainderIndex))
-	else:
-	    code +="   if(blockIdx.x <= %d)\n"%(self.getNumRemainderBlocks(remainder,remainderIndex))
-        code +="   {\n"
-        code +="     idx = blockIdx.x*%d + threadIdx.x;\n"%(self.vectorLength)
-        count = 0
-        for loopIdx in self.loopPerm:
-            count = count + 1
-            if(loopIdx != remainderIndex):
-                code +="     i%d = idx%%size%d;\n"%(loopIdx, loopIdx)
-                if(count != len(self.loopPerm)):
-                   code +="     idx /= size%d;\n"%(loopIdx)
-            else:
-                code +="     i%d = size%d + idx%%(remainder%d);\n"%(loopIdx, remainderIndex, remainderIndex)
-                if(count != len(self.loopPerm)):
-                   code +="     idx /= remainder%d;\n"%(remainderIndex)
-
-        code +="\n"
-        code += self.getUpdateString("     ")
-
-        code +="   }\n"
-        code +="   __syncthreads();\n\n"
-        
-        return code     
+  
 
 
     def getRemainder64(self):
@@ -424,38 +381,45 @@ class cuda_transpose:
         code +="      int rowId = threadIdx.x&63;\n"
         code +="      int colId = threadIdx.x/64;\n"
 	code +="      for(int j=colId; j<64; j=j+%d)\n"%(self.vectorLength/64)
-        if(self.remainderA != 0 or self.remainderB !=0):
-           code +="       if((i%d+rowId)<size%d && (i%d+j)<size%d)\n"%(0,0, self.perm[0], self.perm[0])
+        #if(self.remainderA != 0 or self.remainderB !=0):
+        code +="       if((i%d+rowId)<size%d && (i%d+j)<size%d)\n"%(0,0, self.perm[0], self.perm[0])
         code += self.getUpdateString("           ") 
 
 	return code    
         
 
-    def getNumRemainderBlocks(self, remainder, remainderIndex):
-        numBlocks = remainder
-	for i in range(self.dim):
-            if(i != remainderIndex):
-		if( i != self.remainderIntersectIndex):
-	            numBlocks = numBlocks*self.size[i]
-		else:
-		    numBlocks = numBlocks*(self.size[i] - self.remainderIntersect)
-		    
-
-        return math.ceil((float)(numBlocks)/self.vectorLength)        
+      
 
 
 
-    def getHostCall(self): 
+    def getHostCall(self,fastestVersion=0): 
 	code = "\n\n"
-	code += self.getCudaTransposeHeader(0)
+	code += self.getCudaTransposeHeader(0,fastestVersion)
 	code += "\n{\n"
-	#code += "   int numBlocks = %d;\n"%(max(self.getNumBlocks(),self.getNumRemainderBlocks(self.remainderA, self.remainderIndexA),self.getNumRemainderBlocks(self.remainderB, self.remainderIndexB)))
-	code += "   int numBlocks = %d;\n"%(self.getNumBlocks())
+
+	code += "//   int numBlocks = %d;\n"%(self.getNumBlocks()[0])
+        code += self.getNumBlocks()[1]
+        code += "\n\n"
+	code += "    int *d_size, *d_lda, *d_ldb;\n"
+	code += "    cudaMalloc(&d_size,%d*sizeof(int));\n"%(self.dim)
+        code +=  ttc_util.getCudaErrorChecking("    ", "hostCall")
+	code += "    cudaMalloc(&d_lda,%d*sizeof(int));\n"%(self.dim)
+        code +=  ttc_util.getCudaErrorChecking("    ", "hostCall")
+	code += "    cudaMalloc(&d_ldb,%d*sizeof(int));\n"%(self.dim)
+        code +=  ttc_util.getCudaErrorChecking("    ", "hostCall")
+	code += "    cudaMemcpy(d_size, size,%d*sizeof(int), cudaMemcpyHostToDevice);\n"%(self.dim)
+        code +=  ttc_util.getCudaErrorChecking("    ", "hostCall")
+	code += "    cudaMemcpy(d_lda, lda,%d*sizeof(int), cudaMemcpyHostToDevice);\n"%(self.dim)
+        code +=  ttc_util.getCudaErrorChecking("    ", "hostCall")
+	code += "    cudaMemcpy(d_ldb, ldb,%d*sizeof(int), cudaMemcpyHostToDevice);\n"%(self.dim)
+        code +=  ttc_util.getCudaErrorChecking("    ", "hostCall")
+        code += "\n\n"
+
 	if(self.isBeta):
-	    code += "   %s<<<numBlocks,%d>>>(A,B,alpha,beta);\n"%(self.getHeaderName(1), self.vectorLength)
+	    code += "   %s<<<numBlocks,%d>>>(A,B,alpha,beta,d_size,d_lda,d_ldb);\n"%(self.getHeaderName(1), self.vectorLength)
 	else:
-	    code += "   %s<<<numBlocks,%d>>>(A,B,alpha);\n"%(self.getHeaderName(1), self.vectorLength)
-	code += "   cudaDeviceSynchronize();\n"
+	    code += "   %s<<<numBlocks,%d>>>(A,B,alpha,d_size,d_lda,d_ldb);\n"%(self.getHeaderName(1), self.vectorLength)
+	code += "   cudaDeviceSynchronize();\n\n"
         code +=  ttc_util.getCudaErrorChecking("   ", self.getHeaderName(1))
         code += "}\n" 
 
@@ -468,25 +432,19 @@ class cuda_transpose:
 	return code
 	 
 
-    def getCudaTransposeHeader(self,device = 1):
+    def getCudaTransposeHeader(self,device=1,fastestVersion=0):
         code = ""
         if(device):
             functionType = "__global__\nvoid "
         else:
             functionType = "extern \"C\" void "
  
-	if(device):
-            if(self.isBeta):
-               code +="%s %s( %s *A, %s *B, const %s alpha, const %s beta)"%(functionType, self.getHeaderName(), self.floatType,self.floatType,self.alphaFloatType,self.alphaFloatType)
-            else:
-               code +="%s %s( %s *A, %s *B, const %s alpha)"%(functionType, self.getHeaderName(), self.floatType,self.floatType,self.alphaFloatType)
-        
-	else:
-            if(self.isBeta):
-               code +="%s %s( %s *A, %s *B, const %s alpha, const %s beta)"%(functionType, self.getHeaderName(0), self.floatType,self.floatType,self.alphaFloatType,self.alphaFloatType)
-            else:
-               code +="%s %s( %s *A, %s *B, const %s alpha)"%(functionType,self.getHeaderName(0), self.floatType,self.floatType,self.alphaFloatType)
-		
+	
+        if(self.isBeta):
+           code +="%s %s( %s *A, %s *B, const %s alpha, const %s beta, const int *size, const int *lda, const int *ldb)"%(functionType, self.getHeaderName(device,fastestVersion), self.floatTypeA,self.floatTypeB,self.alphaFloatType,self.betaFloatType)
+        else:
+           code +="%s %s( %s *A, %s *B, const %s alpha, const int *size, const int *lda, const int *ldb)"%(functionType, self.getHeaderName(device, fastestVersion), self.floatTypeA,self.floatTypeB,self.alphaFloatType)
+        		
 	return code
 
 
@@ -509,26 +467,32 @@ class cuda_transpose:
         return versionName
 
 
-    def getHeaderName(self, device=1):
+    def getHeaderName(self, device=1, fastestVersion=0):
 
+        
+        if(self.floatTypeA == "float"):
+            tmpChar = "s"
+        if(self.floatTypeA == "double"):
+            tmpChar = "d"
+        elif(self.floatTypeA == "cuFloatComplex"):
+            tmpChar = "c"
+        elif(self.floatTypeA == "cuDoubleComplex"):
+            tmpChar = "z"
+
+        if(self.floatTypeA != self.floatTypeB):
+           if(self.floatTypeB == "float"):
+               tmpChar += "s"
+           if(self.floatTypeB == "double"):
+               tmpChar += "d"
+           elif(self.floatTypeB == "cuFloatComplex"):
+               tmpChar += "c"
+           elif(self.floatTypeB == "cuDoubleComplex"):
+               tmpChar += "z"
+            
         if(device):
-            if(self.floatType == "float"):
-                transposeName = "sCuKernel_"
-            if(self.floatType == "double"):
-                transposeName = "dCuKernel_"
-            elif(self.floatType == "cuFloatComplex"):
-                transposeName = "cCuKernel_"
-            elif(self.floatType == "cuDoubleComplex"):
-                transposeName = "zCuKernel_"
+            transposeName = "%sCuKernel_"%tmpChar
 	else:
-            if(self.floatType == "float"):
-                transposeName = "sCuTranspose_"
-            if(self.floatType == "double"):
-                transposeName = "dCuTranspose_"
-            if(self.floatType == "cuFloatComplex"):
-                transposeName = "cCuTranspose_"
-            if(self.floatType == "cuDoubleComplex"):
-                transposeName = "zCuTranspose_"
+            transposeName = "%sCuTranspose_"%tmpChar
 
         for i in self.perm:
             transposeName += str(i)
@@ -539,17 +503,6 @@ class cuda_transpose:
              if(idx != len(self.size)-1):
 		 transposeName +="x"
 
-        transposeName +="_"
-        for idx in range(len(self.lda)):
-             transposeName += "%d"%(self.lda[idx])
-             if(idx != len(self.lda)-1):
-		 transposeName +="x"
-
-	transposeName +="_"
-        for idx in range(len(self.ldb)):
-             transposeName += "%d"%(self.ldb[idx])
-             if(idx != len(self.ldb)-1):
-		 transposeName +="x"
 
         if(len(self.size) != 1):
 	   if(device):
@@ -563,7 +516,10 @@ class cuda_transpose:
 	   else:
 	       code = "%s_Copy_vec%d"%(transposeName, self.vectorLength)
 
-	return code
+        if(fastestVersion == 0):
+	   return code
+        else:
+           return transposeName
 
 
     def getloopPermVersion(self):
@@ -582,24 +538,33 @@ class cuda_transpose:
     def declareVariables(self):
 	code=""
         for i in range(self.dim):
-            code +=  "%sconst int size%d = %d;\n"%(self.indent,i,self.size[i])
+            code +=  "%sconst int size%d = size[%d];\n"%(self.indent,i,i)
         for i in range(len(self.lda)):
-            code +=  "%sconst int lda%d = %d;\n"%(self.indent,i,self.lda[i])
+            if( i == 0):
+               code +=  "%sconst int lda0 = 1;\n"%(self.indent)
+            else:
+               code +=  "%sconst int lda%d = lda%d*lda[%d];\n"%(self.indent,i,i-1,i-1)
         for i in range(len(self.ldb)):
-            code +=  "%sconst int ldb%d = %d;\n"%(self.indent,i,self.ldb[i])
+            if( i == 0):
+               code +=  "%sconst int ldb0 = 1;\n"%(self.indent)  
+            else:      
+               code +=  "%sconst int ldb%d = ldb%d*ldb[%d];\n"%(self.indent,i,i-1,i-1)
         
-        if(self.remainderIndexA != -1 and self.perm[0] != 0):
-            code +=   "%sconst int remainder%d = %d;\n"%(self.indent,self.remainderIndexA, self.remainderA)
-        if( self.remainderIndexB != -1 and self.perm[0] != 0):
-            code +=   "%sconst int remainder%d = %d;\n"%(self.indent,self.remainderIndexB, self.remainderB)
+        if(self.perm[0] != 0):
+            code +=   "%sconst int remainder%d = size%d %% %d;\n"%(self.indent,self.remainderIndexA, self.remainderIndexA, self.blocking[0])
+        if(self.perm[0] != 0):
+            code +=   "%sconst int remainder%d = size%d %% %d;\n"%(self.indent,self.remainderIndexB, self.remainderIndexB, self.blocking[1])
 
-        if(self.floatType == "cuFloatComplex"):
+
+        if(self.floatTypeA == "cuFloatComplex"):
             code +=   "%scuFloatComplex cuAlpha = make_cuFloatComplex(alpha,0.0);\n"%self.indent
+        if(self.floatTypeB == "cuFloatComplex"):
             if(self.isBeta):
                 code +=   "%scuFloatComplex cuBeta = make_cuFloatComplex(beta,0.0);\n"%self.indent
 
-        if(self.floatType == "cuDoubleComplex"):
+        if(self.floatTypeA == "cuDoubleComplex"):
             code +=   "%scuDoubleComplex cuAlpha = make_cuDoubleComplex(alpha,0.0);\n"%self.indent
+        if(self.floatTypeB == "cuDoubleComplex"):
             if(self.isBeta):
                 code +=   "%scuDoubleComplex cuBeta = make_cuDoubleComplex(beta,0.0);\n"%self.indent
 
@@ -610,26 +575,34 @@ class cuda_transpose:
 
     def getNumBlocks(self):	
 	size = copy.deepcopy(self.size)
+        equation = ""
         
 	if(self.perm[0] != 0 ):         
 	    numBlocks = ((size[0]  + self.blocking[0] - 1)/self.blocking[0])*((size[self.perm[0]]+self.blocking[1]-1)/self.blocking[1])
+            equation += "   int numBlocks = ((size[0] + %d -1)/%d)*((size[%d] + %d -1)/%d);\n"%(self.blocking[0],self.blocking[0],self.perm[0],self.blocking[1],self.blocking[1])
 	    for i in range(1,self.dim):
 		if( i != self.perm[0]):
 	            numBlocks = numBlocks*size[i]
+                    equation += "   numBlocks *= size[%d];\n"%i
 	elif(self.matCopy == 0):        
 	    numBlocks = ((size[1]  + self.blocking[0] - 1)/self.blocking[0])*((size[self.perm[1]]+self.blocking[1]-1)/self.blocking[1])
+            equation += "   int numBlocks = ((size[1] + %d -1)/%d)*((size[%d] + %d -1)/%d);\n"%(self.blocking[0],self.blocking[0],self.perm[1],self.blocking[1],self.blocking[1])
 	    for i in range(2,self.dim):
 		if( i != self.perm[1]):
 	            numBlocks = numBlocks*size[i]
+                    equation += "   numBlocks *= size[%d];\n"%i
 	else:
             if(len(self.size) != 1):
 	       numBlocks = ((size[0]  + self.blocking[0] - 1)/self.blocking[0])*((size[1]+self.blocking[1]-1)/self.blocking[1])
+               equation += "   int numBlocks = ((size[0] + %d -1)/%d)*((size[1] + %d -1)/%d);\n"%(self.blocking[0],self.blocking[0],self.blocking[1],self.blocking[1])
 	       for i in range(2,self.dim):
 	            numBlocks = numBlocks*size[i]
+                    equation += "   numBlocks *= size[%d];\n"%i
 	    else:
 	       numBlocks = ((size[0]  + self.blocking[0]*self.blocking[1] - 1)/(self.blocking[0]*self.blocking[1]))
+               equation += "   int numBlocks = ((size[0] + %d -1)/%d);\n"%(self.blocking[0]*self.blocking[1],self.blocking[0]*self.blocking[1])
 	    	
-	return numBlocks
+	return (numBlocks, equation)
             
 
     def getOffsetA(self):
@@ -807,9 +780,9 @@ class cuda_transpose:
            code +="   int colId = threadIdx.x/%d;\n"%(self.blocking[1])
 	   code +="   for(int j=colId; j<%d; j=j+%d)\n"%(self.blocking[1],(self.vectorLength/self.blocking[0]))
 
-           if(self.remainderA != 0 or self.remainderB !=0):
-              code +="    if((i0+rowId)<size0 && (i1+j)<size1)\n" 
-              code += self.getUpdateString("        ")
+          # if(self.remainderA != 0 or self.remainderB !=0):
+           code +="    if((i0+rowId)<size0 && (i1+j)<size1)\n" 
+           code += self.getUpdateString("        ")
 	else: 
 	   code = "\n"
            code +="   int rowId = threadIdx.x;\n"
@@ -822,7 +795,7 @@ class cuda_transpose:
 
     def getUpdateString(self, indent):
       code = ""
-      if(self.floatType == "float" or self.floatType == "double"):
+      if(self.floatTypeA == "float" or self.floatTypeA == "double"):
           if(self.perm[0] == 0 and self.matCopy == 0):
 	        if(self.isBeta):
 		    code += indent + "B[i0+ %s] = alpha*A[i0 + %s] + beta*B[i0 + %s];\n"%(self.getOffsetB(),self.getOffsetA(),self.getOffsetB())
@@ -838,45 +811,93 @@ class cuda_transpose:
                     code += indent + "B[%s] = alpha*A[%s] + beta*B[%s];\n"%(self.getOffsetB(),self.getOffsetA(),self.getOffsetB())
                else:
                     code += indent + "B[%s] = alpha*A[%s];\n"%(self.getOffsetB(), self.getOffsetA())
-      if(self.floatType == "cuFloatComplex"):
+
+      if(self.floatTypeA == "cuFloatComplex"):
+          CuMulA = "cuCmulf"
+      if(self.floatTypeA == "cuDoubleComplex"):
+          CuMulA = "cuCmul"  
+      if(self.floatTypeB == "cuFloatComplex"):
+          CuMulB = "cuCmulf"
+      if(self.floatTypeB == "cuDoubleComplex"):
+          CuMulB = "cuCmul" 
+      mixed=1
+      if(self.floatTypeA == self.floatTypeB):
+          mixed=0
+      
+
+      if(self.floatTypeB == "cuFloatComplex" and mixed ==0):
           if(self.perm[0] == 0 and self.matCopy == 0):
 	        if(self.isBeta):
-		    code += indent + "B[i0+ %s] = cuCaddf(cuCmulf(cuAlpha,A[i0 + %s]) , cuCmulf(cuBeta,B[i0 + %s]));\n"%(self.getOffsetB(),self.getOffsetA(),self.getOffsetB())
+		    code += indent + "B[i0+ %s] = cuCaddf(%s(cuAlpha,A[i0 + %s]) , %s(cuBeta,B[i0 + %s]));\n"%(self.getOffsetB(),CuMulA,self.getOffsetA(),CuMulB,self.getOffsetB())
 	        else:
-		    code += indent + "B[i0 + %s] = cuCmulf(cuAlpha,A[i0 + %s]);\n"%(self.getOffsetB(),self.getOffsetA())
+		    code += indent + "B[i0 + %s] = %s(cuAlpha,A[i0 + %s]);\n"%(self.getOffsetB(),CuMulA,self.getOffsetA())
           elif(self.perm[0] != 0 and self.rem64 != 0):
 	        if(self.isBeta):
-                    code += indent + "B[%s] = cuCaddf(cuCmulf(cuAlpha,A[%s]) , cuCmulf(cuBeta,B[%s]));\n"%(self.getRem64OffsetB(),self.getRem64OffsetA(),self.getRem64OffsetB())
+                    code += indent + "B[%s] = cuCaddf(%s(cuAlpha,A[%s]) , %s(cuBeta,B[%s]));\n"%(self.getRem64OffsetB(),CuMulA,self.getRem64OffsetA(),CuMulB,self.getRem64OffsetB())
                 else:
-                    code +=indent + "B[%s] = cuCmulf(cuAlpha,A[%s]);\n"%(self.getRem64OffsetB(), self.getRem64OffsetA()) 
+                    code +=indent + "B[%s] = %s(cuAlpha,A[%s]);\n"%(self.getRem64OffsetB(),CuMulA, self.getRem64OffsetA()) 
           else: 
                if(self.isBeta):
-                    code += indent + "B[%s] = cuCaddf(cuCmulf(cuAlpha,A[%s]) , cuCmulf(cuBeta,B[%s]));\n"%(self.getOffsetB(),self.getOffsetA(),self.getOffsetB())
+                    code += indent + "B[%s] = cuCaddf(%s(cuAlpha,A[%s]) , %s(cuBeta,B[%s]));\n"%(self.getOffsetB(),CuMulA,self.getOffsetA(),CuMulB,self.getOffsetB())
                else:
-                    code += indent + "B[%s] = cuCmulf(cuAlpha,A[%s]);\n"%(self.getOffsetB(), self.getOffsetA())
-      if(self.floatType == "cuDoubleComplex"):
+                    code += indent + "B[%s] = %s(cuAlpha,A[%s]);\n"%(self.getOffsetB(),CuMulA, self.getOffsetA())
+      if(self.floatTypeB == "cuDoubleComplex" and mixed ==0):
           if(self.perm[0] == 0 and self.matCopy == 0):
 	        if(self.isBeta):
-		    code += indent + "B[i0+ %s] = cuCadd(cuCmul(cuAlpha,A[i0 + %s]) , cuCmul(cuBeta,B[i0 + %s]));\n"%(self.getOffsetB(),self.getOffsetA(),self.getOffsetB())
+		    code += indent + "B[i0+ %s] = cuCadd(%s(cuAlpha,A[i0 + %s]) , %s(cuBeta,B[i0 + %s]));\n"%(self.getOffsetB(),CuMulA,self.getOffsetA(),CuMulB,self.getOffsetB())
 	        else:
-		    code += indent + "B[i0 + %s] = cuCmul(cuAlpha,A[i0 + %s]);\n"%(self.getOffsetB(),self.getOffsetA())
+		    code += indent + "B[i0 + %s] = %s(cuAlpha,A[i0 + %s]);\n"%(self.getOffsetB(),CuMulA,self.getOffsetA())
           elif(self.perm[0] != 0 and self.rem64 != 0):
 	        if(self.isBeta):
-                    code += indent + "B[%s] = cuCadd(cuCmul(cuAlpha,A[%s]) , cuCmul(cuBeta,B[%s]));\n"%(self.getRem64OffsetB(),self.getRem64OffsetA(),self.getRem64OffsetB())
+                    code += indent + "B[%s] = cuCadd(%s(cuAlpha,A[%s]) , %s(cuBeta,B[%s]));\n"%(self.getRem64OffsetB(),CuMulA,self.getRem64OffsetA(),CuMulB,self.getRem64OffsetB())
                 else:
-                    code +=indent + "B[%s] = cuCmul(cuAlpha,A[%s]);\n"%(self.getRem64OffsetB(), self.getRem64OffsetA()) 
+                    code +=indent + "B[%s] = %s(cuAlpha,A[%s]);\n"%(self.getRem64OffsetB(),CuMulA, self.getRem64OffsetA()) 
           else: 
                if(self.isBeta):
-                    code += indent + "B[%s] = cuCadd(cuCmul(cuAlpha,A[%s]) , cuCmul(cuBeta,B[%s]));\n"%(self.getOffsetB(),self.getOffsetA(),self.getOffsetB())
+                    code += indent + "B[%s] = cuCadd(%s(cuAlpha,A[%s]) , %s(cuBeta,B[%s]));\n"%(self.getOffsetB(),CuMulA,self.getOffsetA(),CuMulB,self.getOffsetB())
                else:
-                    code += indent + "B[%s] = cuCmul(cuAlpha,A[%s]);\n"%(self.getOffsetB(), self.getOffsetA())
+                    code += indent + "B[%s] = %s(cuAlpha,A[%s]);\n"%(self.getOffsetB(),CuMulA, self.getOffsetA())
+
+      if(self.floatTypeB == "cuFloatComplex" and mixed ==1):
+          if(self.perm[0] == 0 and self.matCopy == 0):
+	        if(self.isBeta):
+		    code += indent + "B[i0+ %s] = cuCaddf(cuComplexDoubleToFloat(%s(cuAlpha,A[i0 + %s])) , %s(cuBeta,B[i0 + %s]));\n"%(self.getOffsetB(),CuMulA,self.getOffsetA(),CuMulB,self.getOffsetB())
+	        else:
+		    code += indent + "B[i0 + %s] = cuComplexDoubleToFloat(%s(cuAlpha,A[i0 + %s]));\n"%(self.getOffsetB(),CuMulA,self.getOffsetA())
+          elif(self.perm[0] != 0 and self.rem64 != 0):
+	        if(self.isBeta):
+                    code += indent + "B[%s] = cuCaddf(cuComplexDoubleToFloat(%s(cuAlpha,A[%s])) , %s(cuBeta,B[%s]));\n"%(self.getRem64OffsetB(),CuMulA,self.getRem64OffsetA(),CuMulB,self.getRem64OffsetB())
+                else:
+                    code +=indent + "B[%s] = cuComplexDoubleToFloat(%s(cuAlpha,A[%s]));\n"%(self.getRem64OffsetB(),CuMulA, self.getRem64OffsetA()) 
+          else: 
+               if(self.isBeta):
+                    code += indent + "B[%s] = cuCaddf(cuComplexDoubleToFloat(%s(cuAlpha,A[%s])) , %s(cuBeta,B[%s]));\n"%(self.getOffsetB(),CuMulA,self.getOffsetA(),CuMulB,self.getOffsetB())
+               else:
+                    code += indent + "B[%s] = cuComplexDoubleToFloat(%s(cuAlpha,A[%s]));\n"%(self.getOffsetB(),CuMulA, self.getOffsetA())
+
+      if(self.floatTypeB == "cuDoubleComplex" and mixed ==1):
+          if(self.perm[0] == 0 and self.matCopy == 0):
+	        if(self.isBeta):
+		    code += indent + "B[i0+ %s] = cuCadd(cuComplexFloatToDouble(%s(cuAlpha,A[i0 + %s])) , %s(cuBeta,B[i0 + %s]));\n"%(self.getOffsetB(),CuMulA,self.getOffsetA(),CuMulB,self.getOffsetB())
+	        else:
+		    code += indent + "B[i0 + %s] = cuComplexFloatToDouble(%s(cuAlpha,A[i0 + %s]));\n"%(self.getOffsetB(),CuMulA,self.getOffsetA())
+          elif(self.perm[0] != 0 and self.rem64 != 0):
+	        if(self.isBeta):
+                    code += indent + "B[%s] = cuCadd(cuComplexFloatToDouble(%s(cuAlpha,A[%s])) , %s(cuBeta,B[%s]));\n"%(self.getRem64OffsetB(),CuMulA,self.getRem64OffsetA(),CuMulB,self.getRem64OffsetB())
+                else:
+                    code +=indent + "B[%s] = cuComplexFloatToDouble(%s(cuAlpha,A[%s]));\n"%(self.getRem64OffsetB(),CuMulA, self.getRem64OffsetA()) 
+          else: 
+               if(self.isBeta):
+                    code += indent + "B[%s] = cuCadd(cuComplexFloatToDouble(%s(cuAlpha,A[%s])) , %s(cuBeta,B[%s]));\n"%(self.getOffsetB(),CuMulA,self.getOffsetA(),CuMulB,self.getOffsetB())
+               else:
+                    code += indent + "B[%s] = cuComplexFloatToDouble(%s(cuAlpha,A[%s]));\n"%(self.getOffsetB(),CuMulA, self.getOffsetA())
 
       return code
 
 
     def getSharedMemoryUpdateString(self,indent,direction):
       code = ""
-      if(self.floatType == "float" or self.floatType == "double"):
+      if(self.floatTypeA == "float" or self.floatTypeA == "double"):
 	  if(direction == "toTile"):
             code += indent + "tile[j][rowId] =  alpha * Atmp[rowId + j * lda];\n"
           if(direction == "fromTile"):  
@@ -884,22 +905,53 @@ class cuda_transpose:
                  code += indent + "Btmp[j * ldb + rowId] = tile[rowId][j] + beta*Btmp[j * ldb + rowId];\n"
             else:
                  code += indent + "Btmp[j * ldb + rowId] = tile[rowId][j];\n"
-      if(self.floatType == "cuFloatComplex"):
+
+      if(self.floatTypeA == "cuFloatComplex"):
+          CuMulA = "cuCmulf"
+      if(self.floatTypeA == "cuDoubleComplex"):
+          CuMulA = "cuCmul"  
+      if(self.floatTypeB == "cuFloatComplex"):
+          CuMulB = "cuCmulf"
+      if(self.floatTypeB == "cuDoubleComplex"):
+          CuMulB = "cuCmul" 
+      mixed=1
+      if(self.floatTypeA == self.floatTypeB):
+          mixed=0
+
+      if(self.floatTypeB == "cuFloatComplex" and mixed == 0):
 	  if(direction == "toTile"):
-            code += indent + "tile[j][rowId] =  cuCmulf(cuAlpha , Atmp[rowId + j * lda]);\n"
+            code += indent + "tile[j][rowId] =  %s(cuAlpha , Atmp[rowId + j * lda]);\n"%CuMulA
           if(direction == "fromTile"):  
             if(self.isBeta):  
-                 code += indent + "Btmp[j * ldb + rowId] = cuCaddf(tile[rowId][j] , cuCmulf(cuBeta,Btmp[j * ldb + rowId]));\n"
+                 code += indent + "Btmp[j * ldb + rowId] = cuCaddf(tile[rowId][j] , %s(cuBeta,Btmp[j * ldb + rowId]));\n"%CuMulB
             else:
                  code += indent + "Btmp[j * ldb + rowId] = tile[rowId][j];\n"
-      if(self.floatType == "cuDoubleComplex"):
+      if(self.floatTypeB == "cuDoubleComplex" and mixed == 0):
 	  if(direction == "toTile"):
-            code += indent + "tile[j][rowId] =  cuCmul(cuAlpha , Atmp[rowId + j * lda]);\n"
+            code += indent + "tile[j][rowId] =  %s(cuAlpha , Atmp[rowId + j * lda]);\n"%CuMulA
           if(direction == "fromTile"):  
             if(self.isBeta):  
-                 code += indent + "Btmp[j * ldb + rowId] = cuCadd(tile[rowId][j] , cuCmul(cuBeta,Btmp[j * ldb + rowId]));\n"
+                 code += indent + "Btmp[j * ldb + rowId] = cuCadd(tile[rowId][j] , %s(cuBeta,Btmp[j * ldb + rowId]));\n"%CuMulB
             else:
                  code += indent + "Btmp[j * ldb + rowId] = tile[rowId][j];\n"
+
+      if(self.floatTypeB == "cuFloatComplex" and mixed == 1):
+	  if(direction == "toTile"):
+            code += indent + "tile[j][rowId] =  %s(cuAlpha , Atmp[rowId + j * lda]);\n"%CuMulA
+          if(direction == "fromTile"):  
+            if(self.isBeta):  
+                 code += indent + "Btmp[j * ldb + rowId] = cuCaddf(cuComplexDoubleToFloat(tile[rowId][j]) , %s(cuBeta,Btmp[j * ldb + rowId]));\n"%CuMulB
+            else:
+                 code += indent + "Btmp[j * ldb + rowId] = cuComplexDoubleToFloat(tile[rowId][j]);\n"
+
+      if(self.floatTypeB == "cuDoubleComplex" and mixed == 1):
+	  if(direction == "toTile"):
+            code += indent + "tile[j][rowId] =  %s(cuAlpha , Atmp[rowId + j * lda]);\n"%CuMulA
+          if(direction == "fromTile"):  
+            if(self.isBeta):  
+                 code += indent + "Btmp[j * ldb + rowId] = cuCadd(cuComplexFloatToDouble(tile[rowId][j]) , %s(cuBeta,Btmp[j * ldb + rowId]));\n"%CuMulB
+            else:
+                 code += indent + "Btmp[j * ldb + rowId] = cuComplexFloatToDouble(tile[rowId][j]);\n"
 
       return code
 
