@@ -429,40 +429,41 @@ class implementation:
             for i in range(self.dim):
                 self.code +=  "%sconst int size%d = size[%d];\n"%(self.indent,i,i)
 
-        #LDA
-        for i in range(1,self.dim):
-            self.code +=  "%sint lda%d;\n"%(self.indent,i)
-        self.code += "%sif( lda == NULL ){\n"%(self.indent)
-        self.code += "%s   lda1 = size0;\n"%(self.indent)
-        for i in range(2,self.dim):
-            self.code += "%s   lda%d = size%d * lda%d;\n"%(self.indent,i,i-1,i-1)
-        self.code += "%s}else{\n"%(self.indent)
-        self.code +=  "%s   lda1 = lda[0];\n"%(self.indent)
-        for i in range(2,self.dim):
-            self.code +=  "%s   lda%d = lda[%d] * lda%d;\n"%(self.indent,i,i-1,i-1)
-        self.code += "%s}\n"%(self.indent)
+        if(self.dim > 1):
+            #LDA
+            for i in range(1,self.dim):
+                self.code +=  "%sint lda%d;\n"%(self.indent,i)
+            self.code += "%sif( lda == NULL ){\n"%(self.indent)
+            self.code += "%s   lda1 = size0;\n"%(self.indent)
+            for i in range(2,self.dim):
+                self.code += "%s   lda%d = size%d * lda%d;\n"%(self.indent,i,i-1,i-1)
+            self.code += "%s}else{\n"%(self.indent)
+            self.code +=  "%s   lda1 = lda[0];\n"%(self.indent)
+            for i in range(2,self.dim):
+                self.code +=  "%s   lda%d = lda[%d] * lda%d;\n"%(self.indent,i,i-1,i-1)
+            self.code += "%s}\n"%(self.indent)
 
-        #LDB
-        for i in range(1,self.dim):
-            self.code +=  "%sint ldb%d;\n"%(self.indent,i)
-        self.code += "%sif( ldb == NULL ){\n"%(self.indent)
-        self.code += "%s   ldb1 = size%d;\n"%(self.indent,self.perm[0])
-        for i in range(2,self.dim):
-            self.code += "%s   ldb%d = size%d * ldb%d;\n"%(self.indent,i,self.perm[i-1],i-1)
-        self.code += "%s}else{\n"%(self.indent)
-        self.code +=  "%s   ldb1 = ldb[0];\n"%(self.indent)
-        for i in range(2,self.dim):
-            self.code +=  "%s   ldb%d = ldb[%d] * ldb%d;\n"%(self.indent,i,i-1,i-1)
-        self.code += "%s}\n"%(self.indent)
+            #LDB
+            for i in range(1,self.dim):
+                self.code +=  "%sint ldb%d;\n"%(self.indent,i)
+            self.code += "%sif( ldb == NULL ){\n"%(self.indent)
+            self.code += "%s   ldb1 = size%d;\n"%(self.indent,self.perm[0])
+            for i in range(2,self.dim):
+                self.code += "%s   ldb%d = size%d * ldb%d;\n"%(self.indent,i,self.perm[i-1],i-1)
+            self.code += "%s}else{\n"%(self.indent)
+            self.code +=  "%s   ldb1 = ldb[0];\n"%(self.indent)
+            for i in range(2,self.dim):
+                self.code +=  "%s   ldb%d = ldb[%d] * ldb%d;\n"%(self.indent,i,i-1,i-1)
+            self.code += "%s}\n"%(self.indent)
 
-        if( self.perm[0] != 0 ):
-            self.code +=   "%sconst int remainder0 = size0 %% %d;\n"%(self.indent,self.blockA)
-            self.code +=   "%sconst int remainder%d = size%d %% %d;\n"%(self.indent,self.perm[0],self.perm[0], self.blockB)
-        else:
-            if(self.blockA != 1):
+            if( self.perm[0] != 0 ):
+                self.code +=   "%sconst int remainder0 = size0 %% %d;\n"%(self.indent,self.blockA)
+                self.code +=   "%sconst int remainder%d = size%d %% %d;\n"%(self.indent,self.perm[0],self.perm[0], self.blockB)
+            else:
                 self.code +=   "%sconst int remainder1 = size1 %% %d;\n"%(self.indent,self.blockA)
-            if(self.blockB != 1):
-                self.code +=   "%sconst int remainder%d = size%d %% %d;\n"%(self.indent,self.perm[1],self.perm[1], self.blockB)
+                if(self.perm[1] != 1):
+                    self.code +=   "%sconst int remainder%d = size%d %% %d;\n"%(self.indent,self.perm[1],self.perm[1], self.blockB)
+
         if( self.prefetchDistance > 0 and self.debug ):
             self.code +=   "%sint offsetAnext = 0, offsetBnext = 0;\n"%(self.indent)
 

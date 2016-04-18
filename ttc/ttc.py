@@ -877,8 +877,7 @@ def generateTransposition( ttcArgs ):
                         else:
                             ret = subprocess.call(["make", "-j%d"%numThreadsCompile, ttcArgs.compiler])
                 if ret != 0 :
-                    print FAIL+"[Error] compilation failed. Retry with '-v' option to see the compilation errors." + ENDC
-                    _logFile.write(FAIL+"[Error] compilation failed. Retry with '-v' option to see the compilation errors.\n" + ENDC)
+                    print FAIL+"[TTC] [Error] compilation failed. Retry with '-v' option to see the compilation errors." + ENDC
                     exit(-1)
                 compilationTime = (_time.time() - t0)
                 if( ttcArgs.silent != 1):
@@ -905,7 +904,7 @@ def generateTransposition( ttcArgs ):
                     _numSockets = 2
                     proc = subprocess.Popen(["mpirun", "-n","%d"%_numSockets, "-env", "I_MPI_PIN", "1", "-env", "KMP_AFFINITY=verbose,compact", "-env", "OMP_NUM_THREADS=%d"%(ttcArgs.numThreads/_numSockets), "-env","I_MPI_PIN_DOMAIN=socket", "-env","I_MPI_PIN_CELL=core","./transpose.exe"],stderr=subprocess.STDOUT,stdout=subprocess.PIPE, env=my_env)
                 else:
-                    if( ttcArgs.architecture == "knc" or ttcArgs.architecture == "avx512"):
+                    if( ttcArgs.architecture == "knc"):
                         proc = subprocess.Popen(["ssh_mic","source /etc/profile; KMP_AFFINITY=%s OMP_NUM_THREADS=%d  %s/transpose.exe"%(ttcArgs.affinity,ttcArgs.numThreads,_ttc_root)],stderr=subprocess.STDOUT,stdout=subprocess.PIPE, env=my_env, stdin=subprocess.PIPE)
                     else:
                         proc = subprocess.Popen(['./transpose.exe'],stderr=subprocess.STDOUT,stdout=subprocess.PIPE, env=my_env)

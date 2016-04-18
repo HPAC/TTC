@@ -34,7 +34,7 @@ knc2: all
 avx512: 
 	${MAKE} clean 
 	${MAKE} avx5122
-avx5122: CXX_FLAGS += -openmp -mmic 
+avx5122: CXX_FLAGS += -openmp -xMIC-AVX512
 avx5122: CXX=icpc
 avx5122: all
 
