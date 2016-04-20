@@ -1,0 +1,27 @@
+   __m512d r121, r139, r120, r138, r71, r89, r70, r88, r11, r1, r55, r29, r10, r0, r54, r28;
+   r28 = _mm512_unpacklo_pd( rowA4, rowA5 );
+   r54 = _mm512_unpacklo_pd( rowA6, rowA7 );
+    r0 = _mm512_unpacklo_pd( rowA0, rowA1 );
+   r10 = _mm512_unpacklo_pd( rowA2, rowA3 );
+   r29 = _mm512_unpackhi_pd( rowA4, rowA5 );
+   r55 = _mm512_unpackhi_pd( rowA6, rowA7 );
+    r1 = _mm512_unpackhi_pd( rowA0, rowA1 );
+   r11 = _mm512_unpackhi_pd( rowA2, rowA3 );
+
+   r88 = _mm512_shuffle_f64x2( r28, r54, 0x44 );
+   r70 = _mm512_shuffle_f64x2( r0, r10, 0x44 );
+   r89 = _mm512_shuffle_f64x2( r28, r54, 0xee );
+   r71 = _mm512_shuffle_f64x2( r0, r10, 0xee );
+   r138 = _mm512_shuffle_f64x2( r29, r55, 0x44 );
+   r120 = _mm512_shuffle_f64x2( r1, r11, 0x44 );
+   r139 = _mm512_shuffle_f64x2( r29, r55, 0xee );
+   r121 = _mm512_shuffle_f64x2( r1, r11, 0xee );
+
+   rowA0 = _mm512_shuffle_f64x2( r70, r88, 0x88 );
+   rowA4 = _mm512_shuffle_f64x2( r71, r89, 0x88 );
+   rowA1 = _mm512_shuffle_f64x2( r120, r138, 0x88 );
+   rowA5 = _mm512_shuffle_f64x2( r121, r139, 0x88 );
+   rowA2 = _mm512_shuffle_f64x2( r70, r88, 0xdd );
+   rowA6 = _mm512_shuffle_f64x2( r71, r89, 0xdd );
+   rowA3 = _mm512_shuffle_f64x2( r120, r138, 0xdd );
+   rowA7 = _mm512_shuffle_f64x2( r121, r139, 0xdd );
