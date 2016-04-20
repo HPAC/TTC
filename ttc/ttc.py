@@ -158,7 +158,7 @@ def printHelp():
     print "   --help".ljust(60),"prints this help"
     print "   --threadsPerBlock=[128,256,512]".ljust(60),"Set the number of threads per threadblock (CUDA only). Default: 256."
     print """   --architecture=
-    avx, power (experimental), avx512 (experimental), knc, cuda 
+    avx, power (experimental), avx512, knc, cuda 
     
     Default: avx
     

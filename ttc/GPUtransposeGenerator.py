@@ -381,17 +381,17 @@ class GPUtransposeGenerator:
         hppCode +="#include <stdlib.h>\n"
         hppCode +="#include <string>\n"
         hppCode +="\n"
-        hppCode += "void printMatrix2Dcomplex(const %s *A, int *size);\n"%(self.floatTypeA)
-        code +="void printMatrix2Dcomplex(const %s *A, int *size)"%(self.floatTypeA)
-        code +="{\n"
-        code +="   for(int i=0;i < size[0]; ++i){\n"
-        code +="      for(int j=0;j < size[1]; ++j){\n"
-        code +="       //  printf(\"(%.2e,%.2e) \", creal(A[i + j * size[0]]), cimag(A[i + j * size[0]]));\n"
-        code +="      }\n"
-        code +="      printf(\"\\n\");\n"
-        code +="   }\n"
-        code +="   printf(\"\\n\");\n"
-        code +="}\n"
+#        hppCode += "void printMatrix2Dcomplex(const %s *A, int *size);\n"%(self.floatTypeA)
+#        code +="void printMatrix2Dcomplex(const %s *A, int *size)"%(self.floatTypeA)
+#        code +="{\n"
+#        code +="   for(int i=0;i < size[0]; ++i){\n"
+#        code +="      for(int j=0;j < size[1]; ++j){\n"
+#        code +="       //  printf(\"(%.2e,%.2e) \", creal(A[i + j * size[0]]), cimag(A[i + j * size[0]]));\n"
+#        code +="      }\n"
+#        code +="      printf(\"\\n\");\n"
+#        code +="   }\n"
+#        code +="   printf(\"\\n\");\n"
+#        code +="}\n"
 
         hppCode +="void restore(const %s *in, %s*out, int total_size);\n"%(self.floatTypeB,self.floatTypeB)
         code +="void restore(const %s *in, %s*out, int total_size)"%(self.floatTypeB,self.floatTypeB)

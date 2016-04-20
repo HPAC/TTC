@@ -376,29 +376,29 @@ class transposeGenerator:
         if self.papi:
             hppCode +="#include <papi.h>\n"
         hppCode +="\n"
-        hppCode += "void printMatrix2Dcomplex(const %s *A, int *size);"%(self.floatTypeA) 
-        hppCode += "void printMatrix2D(const %s *A, int *size);"%(self.floatTypeA) 
-        code +="void printMatrix2Dcomplex(const %s *A, int *size)"%(self.floatTypeA)
-        code +="{\n"
-        code +="   for(int i=0;i < size[0]; ++i){\n"
-        code +="      for(int j=0;j < size[1]; ++j){\n"
-        code +="         printf(\"(%.2e,%.2e) \", creal(A[i + j * size[0]]), cimag(A[i + j * size[0]]));\n"
-        code +="      }\n"
-        code +="      printf(\"\\n\");\n"
-        code +="   }\n"
-        code +="   printf(\"\\n\");\n"
-        code +="}\n"
-
-        code +="void printMatrix2D(const %s *A, int *size)"%(self.floatTypeA)
-        code +="{\n"
-        code +="   for(int i=0;i < size[0]; ++i){\n"
-        code +="      for(int j=0;j < size[1]; ++j){\n"
-        code +="         printf(\"%.8e \", A[i + j * size[0]]);\n"
-        code +="      }\n"
-        code +="      printf(\"\\n\");\n"
-        code +="   }\n"
-        code +="   printf(\"\\n\");\n"
-        code +="}\n"
+#        hppCode += "void printMatrix2Dcomplex(const %s *A, int *size);"%(self.floatTypeA) 
+#        hppCode += "void printMatrix2D(const %s *A, int *size);"%(self.floatTypeA) 
+#        code +="void printMatrix2Dcomplex(const %s *A, int *size)"%(self.floatTypeA)
+#        code +="{\n"
+#        code +="   for(int i=0;i < size[0]; ++i){\n"
+#        code +="      for(int j=0;j < size[1]; ++j){\n"
+#        code +="         printf(\"(%.2e,%.2e) \", creal(A[i + j * size[0]]), cimag(A[i + j * size[0]]));\n"
+#        code +="      }\n"
+#        code +="      printf(\"\\n\");\n"
+#        code +="   }\n"
+#        code +="   printf(\"\\n\");\n"
+#        code +="}\n"
+#
+#        code +="void printMatrix2D(const %s *A, int *size)"%(self.floatTypeA)
+#        code +="{\n"
+#        code +="   for(int i=0;i < size[0]; ++i){\n"
+#        code +="      for(int j=0;j < size[1]; ++j){\n"
+#        code +="         printf(\"%.8e \", A[i + j * size[0]]);\n"
+#        code +="      }\n"
+#        code +="      printf(\"\\n\");\n"
+#        code +="   }\n"
+#        code +="   printf(\"\\n\");\n"
+#        code +="}\n"
 
         hppCode +="void restoreA(const %s *in, %s*out, int total_size);"%(self.floatTypeA,self.floatTypeA)
         code +="void restoreA(const %s *in, %s*out, int total_size)"%(self.floatTypeA,self.floatTypeA)
