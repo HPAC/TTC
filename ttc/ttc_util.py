@@ -98,13 +98,16 @@ def getArchitecture(arch):
 
         return proc.communicate()[0].split(":")[1]
     else:
-        f = open("/proc/cpuinfo", "r")
-        for l in f:
-            if( l.find("model name") != -1):
-                arch = l.split(":")[1]
-                pos = arch.find("@")
-                f.close()
-                return arch[0:pos]
+        try:
+            f = open("/proc/cpuinfo", "r")
+            for l in f:
+                if( l.find("model name") != -1):
+                    arch = l.split(":")[1]
+                    pos = arch.find("@")
+                    f.close()
+                    return arch[0:pos]
+        except:
+            return "dummy"
 
 def getCostLoop(loopPerm, perm, size):
 
