@@ -401,7 +401,7 @@ class cuda_transpose:
         code += self.getNumBlocks()[1]
         code += "\n\n"
 	code += "    int *d_size, *d_lda, *d_ldb;\n"
-	code += "    cudaMalloc(&d_size,%d*sizeof(int));\n"%(self.dim)
+	code += "    cudaMalloc(&d_size,%d*sizeof(int));\n"%(self.dim) #TODO this should become just a single malloc
         code +=  ttc_util.getCudaErrorChecking("    ", "hostCall")
 	code += "    cudaMalloc(&d_lda,%d*sizeof(int));\n"%(self.dim)
         code +=  ttc_util.getCudaErrorChecking("    ", "hostCall")
@@ -421,6 +421,9 @@ class cuda_transpose:
 	    code += "   %s<<<numBlocks,%d>>>(A,B,alpha,d_size,d_lda,d_ldb);\n"%(self.getHeaderName(1), self.vectorLength)
 	code += "   cudaDeviceSynchronize();\n\n"
         code +=  ttc_util.getCudaErrorChecking("   ", self.getHeaderName(1))
+	code += "    cudaFree(d_size);\n"
+	code += "    cudaFree(d_lda);\n"
+	code += "    cudaFree(d_ldb);\n"
         code += "}\n" 
 
 	return code

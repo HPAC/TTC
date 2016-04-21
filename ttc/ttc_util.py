@@ -6,6 +6,16 @@ FAIL = '\033[91m'
 WARNING = '\033[93m'
 ENDC = '\033[0m'
 
+    
+def listToString(l):
+    out = ""
+    if(len(l) > 0):
+        out = "("
+        for idx in l:
+            out += str(idx) + ","
+        out = out[:-1] + ")"
+    return out
+
 class TTCargs:
     def __init__ (self,idxPerm, size):
         self.size = copy.deepcopy(size)
@@ -42,6 +52,30 @@ class TTCargs:
     def getPerm(self):
         return copy.deepcopy(self.idxPerm)
 
+    def getCommandLineString(self):
+        dataType = 's'
+        if(self.floatTypeA == "float" and self.floatTypeB == "float"):
+            dataType = 's'
+        elif(self.floatTypeA == "double" and self.floatTypeB == "double"):
+            dataType = 'd'
+        elif(self.floatTypeA == "double" and self.floatTypeB == "float"):
+            dataType = 'ds'
+        elif(self.floatTypeA == "float" and self.floatTypeB == "double"):
+            dataType = 'sd'
+        elif(self.floatTypeA == "float complex" and self.floatTypeB == "float complex"):
+            dataType = 'c'
+        elif(self.floatTypeA == "double complex" and self.floatTypeB == "double complex"):
+            dataType = 'z'
+        elif(self.floatTypeA == "double complex" and self.floatTypeB == "float complex"):
+            dataType = 'zc'
+        elif(self.floatTypeA == "float complex" and self.floatTypeB == "double complex"):
+            dataType = 'cz'
+        permStr = listToString(self.idxPerm)[1:-1]
+        sizeStr = listToString(self.size)[1:-1]
+        ldaStr = listToString(self.lda)[1:-1]
+        ldbStr = listToString(self.ldb)[1:-1]
+        print "ttc --beta=%f --perm=%s --size=%s --architecture=%s --maxImplementations=%d --lda=%s --ldb=%s --compiler=%s --dataType=%s --numThreads=%d"%(self.beta, permStr, sizeStr, self.architecture, self.maxNumImplementations, ldaStr, ldbStr, self.compiler, dataType, self.numThreads)
+
 
 def getCudaErrorChecking(indent, routine):
    tmpCode =indent+"{cudaError_t err = cudaGetLastError();\n"
@@ -52,15 +86,6 @@ def getCudaErrorChecking(indent, routine):
    return tmpCode
 
 
-    
-def listToString(l):
-    out = ""
-    if(len(l) > 0):
-        out = "("
-        for idx in l:
-            out += str(idx) + ","
-        out = out[:-1] + ")"
-    return out
 
 def getArchitecture(arch):
     if( arch == "cuda" ):
