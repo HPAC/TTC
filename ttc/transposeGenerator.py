@@ -40,19 +40,14 @@ ENDC = '\033[0m'
 class transposeGenerator:
     def __init__(self, perm, loopPermutations, size, alpha, beta, maxNumImplementations,
             floatTypeA, floatTypeB, parallelize, streamingStores, prefetchDistances, blockings, papi,
-            noTest, scalar, align, architecture, mpi, lda, ldb, silent, hotA = 0, hotB = 0):
+            noTest, scalar, align, architecture, mpi, lda, ldb, silent, tmpDirectory, hotA = 0, hotB = 0):
+
 
         self.hotA = hotA
         self.hotB = hotB
         self.silent = silent
-        self.ttc_root = ""
-        if( os.environ.has_key('TTC_ROOT') ):
-            _ttc_root = os.environ['TTC_ROOT']
-        else:
-            print FAIL + "ERROR: TTC_ROOT environment variable not set. Make sure that this variable points to the directory containing 'ttc.py'" + ENDC
-            exit(-1)
-        _ttc_root += "/ttc"
-        os.chdir(_ttc_root)
+
+        self.tmpDirectory = tmpDirectory
 
         self.mpi = mpi 
         self.lda = copy.deepcopy(lda)
@@ -170,17 +165,6 @@ class transposeGenerator:
             self.microBlocking = [(1,1),"NOT AVAILABLE"]
         else:
             self.microBlocking = self.getTranspositionMicroKernel()
-
-        #create tmp directory or delete existing .cpp files
-        self.tmpDirectory = "./tmp/"
-
-        if not os.path.exists(self.tmpDirectory):
-            os.makedirs(self.tmpDirectory)
-        else:
-            #delete all old .cpp and .h files in that folder
-            for filename in os.listdir(self.tmpDirectory):
-                if( filename[-4:] == ".cpp" or filename[-2:] == ".h" ):
-                    os.remove(self.tmpDirectory+filename)
 
         self.minImplementationsPerFile = 64
         self.maxImplementationsPerFile = 256

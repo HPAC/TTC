@@ -1,11 +1,11 @@
 CXX_FLAGS=-O3 
 
 ifeq (${MAKECMDGOALS},nvcc2)
-SRC=$(wildcard tmp/*.cu)
+SRC=$(wildcard *.cu)
 OBJ=$(SRC:.cu=.o)
 TYPE=cu 
 else
-SRC=$(wildcard tmp/*.cpp)
+SRC=$(wildcard *.cpp)
 OBJ=$(SRC:.cpp=.o)
 TYPE= cpp
 endif
@@ -62,4 +62,4 @@ all: ${OBJ}
 	${CXX} ${CXX_FLAGS} ${INCLUDE_PATH} -c $< -o $@
 
 clean:
-	rm -rf tmp/*.o transpose.exe
+	rm -rf *.o transpose.exe

@@ -150,6 +150,7 @@ def printHelp():
     print "   --verbose or -v".ljust(60),"prints compiler output"
     print "   --generateOnly".ljust(60),"only generates the implementations, no timing"
     print "   --noTest".ljust(60),"no validation will be done."
+    print "   --keep".ljust(60),"Keep the generated C++ files in ${TTC_ROOT}/tmp..."
     print "   --ignoreDatabase".ljust(60),"Don't use the SQL database (i.e., no lookup)."
     print "   --no-align".ljust(60),"prevents use of aligned load/store instructions (use this if your arrays are not aligned)."
     print "   --loopPerm=<index1>,<index2>,...,<indexN>[-<next permutation>]".ljust(60),"generates only the specifed loop order"
@@ -191,20 +192,6 @@ def getInfoAboutVersion(version):
         exit(-1)
 
     return (blockA, blockB, prefetchDistance, array)
-
-def getVersion():
-    f = open ("ttc.py","r")
-    for line in f:
-        tokens = line.split()
-        if(len(tokens) == 3 and tokens[1] == "__VERSION__"):
-            f.close()
-            return int(tokens[2])
-        else:
-            f.close()
-            return -1 
-    f.close()
-    return -1 
-
 
 def createBestView(cursor, topXpercent):
     if(topXpercent < 0 or topXpercent > 100):
@@ -645,13 +632,16 @@ def generateTransposition( ttcArgs ):
     workingDir = os.getcwd()
     os.chdir(_ttc_root)
 
+    #create tmp directory
+    tmpDirectory = ttc_util.createTmpDirectory()
+
     ttcArgs.updateDatabase = 1
     _generateOnly = 0
     _papi = 0
     _mpi = 0
     _logFile = open("log.txt","a+")
     _noTest = 0
-    _database = "ttc.db"
+    _database = _ttc_root+"/ttc.db"
 
     if(len (ttcArgs.lda) == 0):
         ttcArgs.lda = []
@@ -831,18 +821,22 @@ def generateTransposition( ttcArgs ):
 
     if(ttcArgs.compiler == "nvcc"):
         generator = gputg.GPUtransposeGenerator(ttcArgs.idxPerm, ttcArgs.loopPermutations, ttcArgs.size, ttcArgs.alpha, ttcArgs.beta,
-                ttcArgs.maxNumImplementations, ttcArgs.floatTypeA, ttcArgs.floatTypeB, ttcArgs.blockings, _noTest ,ttcArgs.vecLength , ttcArgs.lda, ttcArgs.ldb)
+                ttcArgs.maxNumImplementations, ttcArgs.floatTypeA, ttcArgs.floatTypeB, ttcArgs.blockings, _noTest ,ttcArgs.vecLength , ttcArgs.lda, ttcArgs.ldb, tmpDirectory)
     else:		
         generator = tg.transposeGenerator(ttcArgs.idxPerm, ttcArgs.loopPermutations, ttcArgs.size, ttcArgs.alpha, ttcArgs.beta,
                 ttcArgs.maxNumImplementations, ttcArgs.floatTypeA, ttcArgs.floatTypeB, _parallelize, ttcArgs.streamingStores,
                 ttcArgs.prefetchDistances, ttcArgs.blockings, _papi, _noTest, ttcArgs.scalar, ttcArgs.align,
-                ttcArgs.architecture, _mpi, ttcArgs.lda, ttcArgs.ldb, ttcArgs.silent, ttcArgs.hotA, ttcArgs.hotB )
+                ttcArgs.architecture, _mpi, ttcArgs.lda, ttcArgs.ldb, ttcArgs.silent, tmpDirectory, ttcArgs.hotA, ttcArgs.hotB )
 
 
     generator.generate()
     numSolutions = generator.getNumSolutions() + 1#account for reference version
     if( ttcArgs.silent != 1):
         print "Generation of %d implementations took %f seconds "%(numSolutions,_time.time() - t0)
+
+    os.chdir(tmpDirectory)
+    # copy makefile to tmp directory
+    shutil.copyfile("../Makefile","./Makefile")
 
     emitReference = 0
     measuringTime = 0
@@ -1051,7 +1045,7 @@ def generateTransposition( ttcArgs ):
         ###########################################
         if( ttcArgs.updateDatabase and solutionFound == 0 and numSolutions > 1):
 
-            version = getVersion()
+            version = 0
             host = socket.gethostname()
             dim = len(ttcArgs.idxPerm)
 
@@ -1096,6 +1090,10 @@ def generateTransposition( ttcArgs ):
             connection.commit()
             connection.close()
 
+    os.chdir("..")
+    if( not ttcArgs.keep):
+        shutil.rmtree(tmpDirectory)
+
     os.chdir(workingDir)
     _logFile.close()
     return (transposeName,fastestVersionBW )
@@ -1104,7 +1102,7 @@ def main():
 
     _allowedArguments = [ "--compiler","--use-streamingStores","--maxImplementations",
             "--help","--alpha","--beta","--papi","--size","--perm", "--loopPerm","--dataType",
-            "--numThreads", "--generateOnly","--prefetchDistances",
+            "--numThreads", "--generateOnly","--prefetchDistances", "--keep",
             "--updateDatabase","--dontCompile","-v", "--blockings",
             "--noTest","--no-align","--no-vec","--mpi", "--architecture",
             "--affinity","--lda", "--ldb", "--ignoreDatabase", "--threadsPerBlock", "--hotA", "--hotB"]
@@ -1140,6 +1138,7 @@ def main():
     _noTest = 0
     _loopPermutations = []
     _align = 1
+    _keep = 0
     _vecLength = []
 
 
@@ -1159,6 +1158,8 @@ def main():
             print FAIL + "Error: argument "+arg.split("=")[0] + " not valid." + ENDC
             exit(-1)
 
+        if arg == "--keep":
+            _keep = 1
         if arg == "--ignoreDatabase":
             _ignoreDatabase = 1
         if arg == "--mpi":
@@ -1315,6 +1316,7 @@ def main():
     ttc_args = ttc_util.TTCargs(_idxPerm, _size)
     ttc_args.alpha = _alpha
     ttc_args.beta = _beta
+    ttc_args.keep = _keep
     ttc_args.affinity = _affinity
     ttc_args.numThreads = _numThreads
     ttc_args.floatTypeA = _floatTypeA

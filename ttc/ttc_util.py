@@ -1,4 +1,5 @@
 import copy
+import os
 import subprocess
 
 OKGREEN = '\033[92m'
@@ -6,7 +7,16 @@ FAIL = '\033[91m'
 WARNING = '\033[93m'
 ENDC = '\033[0m'
 
-    
+def createTmpDirectory():
+    directory = "tmp"
+    i = 0
+    while( os.path.exists(directory+"%d"%i) ):
+        i += 1
+    tmpDirectory = directory+"%d"%i
+    os.makedirs(tmpDirectory)
+    return tmpDirectory+"/"
+
+
 def listToString(l):
     out = ""
     if(len(l) > 0):
@@ -21,6 +31,7 @@ class TTCargs:
         self.size = copy.deepcopy(size)
         self.idxPerm= copy.deepcopy(idxPerm)
         self.alpha = 1.
+        self.keep = 0
         self.beta = 0.
         self.affinity = ""
         self.numThreads = 0

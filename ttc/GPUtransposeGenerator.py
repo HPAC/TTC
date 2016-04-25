@@ -39,7 +39,7 @@ ENDC = '\033[0m'
 
 class GPUtransposeGenerator:
     def __init__(self, perm, loopPermutations, size, alpha, beta, maxNumImplementations,
-            floatTypeA, floatTypeB, blockings, noTest, vectorLength, lda,ldb):
+            floatTypeA, floatTypeB, blockings, noTest, vectorLength, lda,ldb, tmpDirectory):
 
         self.floatTypeA = floatTypeA
         self.floatTypeB = floatTypeB
@@ -194,15 +194,7 @@ class GPUtransposeGenerator:
 
 
         #create tmp directory or delete existing .cu files
-        self.tmpDirectory = "./tmp/"
-
-        if not os.path.exists(self.tmpDirectory):
-            os.makedirs(self.tmpDirectory)
-        else:
-            #delete all old .cu and .h files in that folder
-            for filename in os.listdir(self.tmpDirectory):
-                if( filename[-3:] == ".cu" or filename[-4:] == ".cpp" or filename[-2:] == ".h" ):
-                    os.remove(self.tmpDirectory+filename)
+        self.tmpDirectory = tmpDirectory
 
         self.minImplementationsPerFile = 64
         self.maxImplementationsPerFile = 256
