@@ -615,8 +615,6 @@ def generateTransposition( ttcArgs ):
     if( (ttcArgs.architecture == "knc" or ttcArgs.architecture == "power") and ttcArgs.floatTypeA != "float"):
         print FAIL + "[TTC] ERROR: the selected architecture doesn't support the selected precision yet." + ENDC
         exit(-1)
-    if( (ttcArgs.architecture == "avx512") ):
-        print WARNING + "[TTC] WARNING: you are trying to generate code for an avx512-enabled processor. This could be either the host or a KNL coprocessor. " + ENDC
 
     if ttcArgs.maxNumImplementations == -1:
         ttcArgs.maxNumImplementations = 10000000
