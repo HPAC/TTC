@@ -58,20 +58,20 @@ class transposeGenerator:
         self.streamingStores = streamingStores
         self.architecture = architecture 
         self.cacheLineSize = 64 #in bytes
-        self.registerSizeBits = 256
         self.alignmentRequirement = 32 #in bytes for AVX
+        self.registerSizeBits = 256
 
         if architecture == "power":
             self.streamingStores = 0
             self.cacheLineSize = 128 #in bytes
         elif architecture == "knc":
             self.streamingStores = 0
-            self.cacheLineSize = 128 #in bytes
             self.registerSizeBits = 512
+            self.cacheLineSize = 128 #in bytes
             self.alignmentRequirement = 64
         elif architecture == "avx512":
-            self.cacheLineSize = 128 #in bytes
             self.registerSizeBits = 512
+            self.cacheLineSize = 128 #in bytes
             self.alignmentRequirement = 64
 
         self.parallelize = parallelize 
@@ -85,14 +85,26 @@ class transposeGenerator:
         self.perm = copy.deepcopy(perm)
         self.indent = "   "
 
-        self.blockings = []
         self.prefetchDistances = copy.deepcopy(prefetchDistances)
         if( self.perm[0] == 0 ):
             self.prefetchDistances = [0] #we don't support prefetching in this case
 
         self.aligned = 1
-        self.floatSizeA = self.__getFloatTypeSize(floatTypeA)
-        self.floatSizeB = self.__getFloatTypeSize(floatTypeB)
+        self.floatSizeA = ttc_util.getFloatTypeSize(floatTypeA)
+        self.floatSizeB = ttc_util.getFloatTypeSize(floatTypeB)
+
+        if( self.scalar == 1):
+            self.microBlocking = ((1,1),"NOT AVAILABLE")
+        else:
+            self.microBlocking = self.getTranspositionMicroKernel()
+
+        if(  self.microBlocking[0][0] * 8 * self.floatSizeA < self.registerSizeBits and self.floatTypeA != self.floatTypeB ):
+           # this is not implemented yet => fallback to sclar
+           self.scalar = 1
+           self.microBlocking = (self.microBlocking[0],"NOT AVAILABLE")
+
+        self.registerSizeBits = self.microBlocking[0][0] * 8 * self.floatSizeA
+
         #obey the alignment requirements for streaming-stores
         if( (self.size[0] * self.floatSizeA) % self.alignmentRequirement != 0 or
                 (self.size[self.perm[0]] * self.floatSizeB) % self.alignmentRequirement != 0):
@@ -100,8 +112,8 @@ class transposeGenerator:
         if( align != 1 ):
             self.aligned = 0
         #initialize available blockings
-        minA = self.registerSizeBits / 8 / self.floatSizeA
-        minB = self.registerSizeBits / 8 / self.floatSizeA
+        minA = self.microBlocking[0][0]
+        minB = self.microBlocking[0][1]
         maxA = minA * 4
         maxB = minB * 4
 
@@ -110,6 +122,7 @@ class transposeGenerator:
             print WARNING + "   => Fallback: use non-vectorized code." + ENDC
             self.scalar = 1
 
+        self.blockings = []
         if( self.perm[0] == 0): 
             if( len(blockings) == 0 ): #default, no blockings provided => use all blockings
                 if( len(self.size) == 1 ): #this is only the case if perm = IDENTITY _and_ lda and ldb are non-default
@@ -160,11 +173,6 @@ class transposeGenerator:
         self.referenceImplementation = transpose.implementation((1,1),
                 perm[-1::-1], self.perm, self.size, self.alpha, self.beta,
                 self.floatTypeA, self.floatTypeB, "",  1, 0,(1,1),1, self.architecture, parallelize)
-
-        if( self.scalar == 1):
-            self.microBlocking = [(1,1),"NOT AVAILABLE"]
-        else:
-            self.microBlocking = self.getTranspositionMicroKernel()
 
         self.minImplementationsPerFile = 64
         self.maxImplementationsPerFile = 256
@@ -260,24 +268,10 @@ class transposeGenerator:
 
     def generate(self):
         if( len(self.size) != 1 and ( not(self.perm[0] == 0 and self.perm[1] == 1)) ): #only use code generator if at least one of the first two indices changes
-            self.getSolutions()
+            self.genCandidates()
         self.printMain()
         self.generateImplementations()
             
-
-    def __getFloatTypeSize(self, floatType):
-        if( floatType == "float" ):
-            return 4
-        elif( floatType == "double" ):
-            return 8
-        elif( floatType == "float complex" ):
-            return 8
-        elif( floatType == "double complex" ):
-            return 16
-        else:
-            print "[TTC] ERROR: unknown data type"
-            exit(-1)
-
     def getAppropriateOptimizations(self):
         optimizations = [""]
 
@@ -297,7 +291,7 @@ class transposeGenerator:
         print string
         return string[:-1]
 
-    def getSolutions(self):
+    def genCandidates(self):
 
         optimizations = self.getAppropriateOptimizations()
 
@@ -339,13 +333,12 @@ class transposeGenerator:
         code +="#include <stdio.h>\n"
         code +="#include <time.h>\n"
         code +="#include <string>\n"
-        if( self.scalar != 1 ):
-            if self.architecture == "avx" or self.architecture == "avx512" or self.architecture == "knc":
-                code +="#include <immintrin.h>\n"
-                code +="#include <xmmintrin.h>\n"
-            elif self.architecture == "power":
-                code += "#include <builtins.h>\n"
-                code += "#include <altivec.h>\n"
+        if self.architecture == "avx" or self.architecture == "avx512" or self.architecture == "knc":
+            code +="#include <immintrin.h>\n"
+            code +="#include <xmmintrin.h>\n"
+        elif self.architecture == "power":
+            code += "#include <builtins.h>\n"
+            code += "#include <altivec.h>\n"
         code +="#include <complex.h>\n"
         if self.papi:
             code +="#include <papi.h>\n"
@@ -458,13 +451,12 @@ class transposeGenerator:
         code +="#include <time.h>\n"
         if self.mpi:
             code +="#include <mpi.h>\n"
-        if( self.scalar != 1 ):
-            if self.architecture == "avx" or self.architecture == "avx512" or self.architecture == "knc":
-                code +="#include <immintrin.h>\n"
-                code +="#include <xmmintrin.h>\n"
-            elif self.architecture == "power":
-                code += "#include <builtins.h>\n"
-                code += "#include <altivec.h>\n"
+        if self.architecture == "avx" or self.architecture == "avx512" or self.architecture == "knc":
+            code +="#include <immintrin.h>\n"
+            code +="#include <xmmintrin.h>\n"
+        elif self.architecture == "power":
+            code += "#include <builtins.h>\n"
+            code += "#include <altivec.h>\n"
         code +="#include <complex.h>\n"
         code +="\n"
 
@@ -837,7 +829,15 @@ class transposeGenerator:
         f.write(code)
         f.close()
 
+    def getScalarFraction(self,blocking):
+        remainderA = (self.size[0] % blocking[0])
+        fractionA = remainderA / self.size[0]
+        remainderB = (self.size[self.perm[0]] % blocking[1])
+        fractionB = remainderB / self.size[self.perm[0]]
+        return max(fractionA, fractionB)
+
     def getTranspositionMicroKernel(self):
+        # we choose the precision based on the input tensor A
         availableBlocking = []
 
         kernelName = self.floatTypeA
@@ -864,7 +864,16 @@ class transposeGenerator:
             print "ERROR: no suitable kernels found."
             exit(-1)
 
-        return availableBlocking[0] #TODO: do we want to support multiple micro-kernels?
+        #determine which micro-blocking to use
+        availableBlocking = sorted(availableBlocking, key = lambda tup : tup[0][0], reverse=True) # sort blockings from large to small
+        for (blocking, code) in availableBlocking:
+           scalarFraction = self.getScalarFraction(blocking)
+           if( scalarFraction >= 0.33 ):
+              continue
+           else:
+              return (blocking,code)
+
+        return availableBlocking[0]
 
     def getLoadKernel(self, A, lda, floatType, mixedPrecision, offset, define):
         code = self.indent +"//Load %s\n"%A
@@ -890,9 +899,15 @@ class transposeGenerator:
                 else:
                     vectorType = "__m%d"%self.registerSizeBits
                     if( self.aligned ):
-                        functionName = "_mm%d_load_ps"%self.registerSizeBits
+                       if( self.registerSizeBits == 128 ):
+                          functionName = "_mm_load_ps"
+                       else:
+                          functionName = "_mm%d_load_ps"%self.registerSizeBits
                     else:
-                        functionName = "_mm%d_loadu_ps"%self.registerSizeBits
+                       if( self.registerSizeBits == 128 ):
+                          functionName = "_mm_loadu_ps"
+                       else:
+                          functionName = "_mm%d_loadu_ps"%self.registerSizeBits
             elif( floatType == "double" or floatType == "double complex"):
                 if( floatType == "double complex" ):
                     cast = "(const double*)"
@@ -905,9 +920,15 @@ class transposeGenerator:
                 else:
                     vectorType = "__m%dd"%self.registerSizeBits
                     if( self.aligned ):
-                        functionName = "_mm%d_load_pd"%self.registerSizeBits
+                       if( self.registerSizeBits == 128 ):
+                          functionName = "_mm_load_pd"
+                       else:
+                          functionName = "_mm%d_load_pd"%self.registerSizeBits
                     else:
-                        functionName = "_mm%d_loadu_pd"%self.registerSizeBits
+                       if( self.registerSizeBits == 128 ):
+                          functionName = "_mm_loadu_pd"
+                       else:
+                          functionName = "_mm%d_loadu_pd"%self.registerSizeBits
             else:
                 print FAIL + "Error: unknown datatype.\n" + ENDC
                 exit(-1)
@@ -950,17 +971,26 @@ class transposeGenerator:
                     if( self.floatSizeB < self.floatSizeA ): # mixed precision 
                         functionName = "_mm_stream_%s"%(post)
                     else:
-                        functionName = "_mm%d_stream_%s"%(self.registerSizeBits,post)
+                       if( self.registerSizeBits == 128 ):
+                          functionName = "_mm_stream_%s"%(post)
+                       else:
+                          functionName = "_mm%d_stream_%s"%(self.registerSizeBits,post)
                 else:
                     if( self.floatSizeB < self.floatSizeA ): # mixed precision 
                         functionName = "_mm_store_%s"%(post)
                     else:
-                        functionName = "_mm%d_store_%s"%(self.registerSizeBits,post)
+                       if( self.registerSizeBits == 128 ):
+                          functionName = "_mm_store_%s"%(post)
+                       else:
+                          functionName = "_mm%d_store_%s"%(self.registerSizeBits,post)
             else:
                 if( self.floatSizeB < self.floatSizeA ): # mixed precision 
                     functionName = "_mm_storeu_%s"%(post)
                 else:
-                    functionName = "_mm%d_storeu_%s"%(self.registerSizeBits,post)
+                    if( self.registerSizeBits == 128 ):
+                       functionName = "_mm_storeu_%s"%(post)
+                    else:
+                       functionName = "_mm%d_storeu_%s"%(self.registerSizeBits,post)
 
             if( self.floatTypeB == "float complex" ):
                 cast = "(float*)"
@@ -989,9 +1019,15 @@ class transposeGenerator:
         code = self.indent +"//Scale %s\n"%A
         maxRange = self.registerSizeBits / 8 / self.floatSizeA
         if( self.floatTypeA == "float" or self.floatTypeA == "float complex"): 
-            functionName = "_mm%d_mul_ps"%self.registerSizeBits
+           if( self.registerSizeBits == 128 ):
+              functionName = "_mm_mul_ps"
+           else:
+              functionName = "_mm%d_mul_ps"%self.registerSizeBits
         if( self.floatTypeA == "double" or self.floatTypeA == "double complex"):
-            functionName = "_mm%d_mul_pd"%self.registerSizeBits
+           if( self.registerSizeBits == 128 ):
+              functionName = "_mm_mul_pd"
+           else:
+              functionName = "_mm%d_mul_pd"%self.registerSizeBits
 
         for i in range(maxRange):
             if(self.architecture == "power"):
@@ -1387,13 +1423,12 @@ class transposeGenerator:
         numSolutionsPerFile = (numImplementations + numFiles - 1) / numFiles
 
         cppCode = ""
-        if( self.scalar != 1 ):
-            if self.architecture == "avx" or self.architecture == "knc" or self.architecture == "avx512":
-                cppCode += "#include <xmmintrin.h>\n"
-                cppCode += "#include <immintrin.h>\n"
-            elif self.architecture == "power":
-                cppCode += "#include <builtins.h>\n"
-                cppCode += "#include <altivec.h>\n"
+        if self.architecture == "avx" or self.architecture == "knc" or self.architecture == "avx512":
+            cppCode += "#include <xmmintrin.h>\n"
+            cppCode += "#include <immintrin.h>\n"
+        elif self.architecture == "power":
+            cppCode += "#include <builtins.h>\n"
+            cppCode += "#include <altivec.h>\n"
 
         cppCode += "#include <complex.h>\n"
         cppCode += "#if defined(__ICC) || defined(__INTEL_COMPILER)\n"
@@ -1402,13 +1437,12 @@ class transposeGenerator:
         cppCode += "#define INLINE __attribute__((always_inline))\n"
         cppCode += "#endif\n\n"
         hppCode = ""
-        if( self.scalar != 1 ):
-            if self.architecture == "avx" or self.architecture == "knc" or self.architecture == "avx512":
-                hppCode += "#include <xmmintrin.h>\n"
-                hppCode += "#include <immintrin.h>\n"
-            elif self.architecture == "power":
-                hppCode += "#include <builtins.h>\n"
-                hppCode += "#include <altivec.h>\n"
+        if self.architecture == "avx" or self.architecture == "knc" or self.architecture == "avx512":
+            hppCode += "#include <xmmintrin.h>\n"
+            hppCode += "#include <immintrin.h>\n"
+        elif self.architecture == "power":
+            hppCode += "#include <builtins.h>\n"
+            hppCode += "#include <altivec.h>\n"
         hppCode += "#include<complex.h>\n"
         tmpPrefetchDistances = list(self.prefetchDistances)
         #we need prefetch distance 0 for the remainder while-loop
