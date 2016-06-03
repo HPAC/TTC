@@ -32,6 +32,7 @@ class TTCargs:
         self.idxPerm= copy.deepcopy(idxPerm)
         self.alpha = 1.
         self.keep = 0
+        self.generateOnly = 0
         self.beta = 0.
         self.affinity = ""
         self.numThreads = 0

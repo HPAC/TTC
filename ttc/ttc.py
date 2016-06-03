@@ -634,7 +634,6 @@ def generateTransposition( ttcArgs ):
     tmpDirectory = ttc_util.createTmpDirectory()
 
     ttcArgs.updateDatabase = 1
-    _generateOnly = 0
     _papi = 0
     _mpi = 0
     _logFile = open("log.txt","a+")
@@ -839,7 +838,7 @@ def generateTransposition( ttcArgs ):
     emitReference = 0
     measuringTime = 0
     compilationTime = 0
-    if _generateOnly == 0:
+    if ttcArgs.generateOnly == 0:
         if( solutionFound == 0 ): #only compile and measure if we have not found the best solution in our database yet
             if( numSolutions > 1):
                 ###########################################
@@ -1312,6 +1311,7 @@ def main():
         exit(0)
 
     ttc_args = ttc_util.TTCargs(_idxPerm, _size)
+    ttc_args.generateOnly = _generateOnly
     ttc_args.alpha = _alpha
     ttc_args.beta = _beta
     ttc_args.keep = _keep
