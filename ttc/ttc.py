@@ -756,6 +756,7 @@ def generateTransposition( ttcArgs ):
         else:
             print "thread affinity: ".ljust(20)+"KMP_AFFINITY=%s"%ttcArgs.affinity
         print "Compiler: ".ljust(20) + ttc_util.getCompilerVersion(ttcArgs.compiler)
+        print "Tempory directory:".ljust(20) + "ttc/"+tmpDirectory
         print "-------------------------------------------"
 
     ###########################################

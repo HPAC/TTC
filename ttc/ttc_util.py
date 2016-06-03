@@ -17,6 +17,20 @@ def createTmpDirectory():
     return tmpDirectory+"/"
 
 
+def getFloatTypeSize(floatType):
+  if( floatType == "float" ):
+      return 4
+  elif( floatType == "double" ):
+      return 8
+  elif( floatType == "float complex" ):
+      return 8
+  elif( floatType == "double complex" ):
+      return 16
+  else:
+      print "[TTC] ERROR: unknown data type"
+      exit(-1)
+
+
 def listToString(l):
     out = ""
     if(len(l) > 0):

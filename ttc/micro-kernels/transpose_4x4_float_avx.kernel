@@ -1,0 +1,9 @@
+   __m128 tmp3, tmp2, tmp1, tmp0;
+   tmp0 = _mm_unpacklo_ps(rowA0, rowA1);
+   tmp2 = _mm_unpacklo_ps(rowA2, rowA3);
+   tmp1 = _mm_unpackhi_ps(rowA0, rowA1);
+   tmp3 = _mm_unpackhi_ps(rowA2, rowA3);
+   rowA0 = _mm_movelh_ps(tmp0, tmp2);
+   rowA1 = _mm_movehl_ps(tmp2, tmp0);
+   rowA2 = _mm_movelh_ps(tmp1, tmp3);
+   rowA3 = _mm_movehl_ps(tmp3, tmp1);

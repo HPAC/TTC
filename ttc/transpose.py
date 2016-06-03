@@ -33,6 +33,7 @@ class implementation:
             optimization, scalar, prefetchDistance, microBlocking, reference,
             architecture, parallelize):
 
+        self.registerSizeBits = microBlocking[0] * 8 * ttc_util.getFloatTypeSize(floatTypeA)
         self.parallelize = parallelize
         self.debug = 0 
         self.floatTypeA = floatTypeA
@@ -357,20 +358,21 @@ class implementation:
         if(self.architecture == "power"):
             self.code += self.indent + "vector4double %s = vec_splats(%s);\n"%(name, value)
         else:
-            if( self.architecture == "knc" or self.architecture == "avx512" ):
-                registerSizeBits = 512
-            else:
-                registerSizeBits = 256
-
             if( value == "beta" and self.floatTypeA.find("double") != -1 and self.floatTypeB.find("float") != -1):
                 _floatType = "__m128"
                 functionName = "_mm_set1_ps"
             elif( floatType == "float" or floatType == "float complex" ):
-                functionName = "_mm%d_set1_ps"%registerSizeBits
-                _floatType = "__m%d"%registerSizeBits
+                if( self.registerSizeBits == 128 ):
+                    functionName = "_mm_set1_ps"
+                else:
+                    functionName = "_mm%d_set1_ps"%self.registerSizeBits
+                _floatType = "__m%d"%self.registerSizeBits
             elif( floatType == "double" or  floatType == "double complex" ):
-                functionName = "_mm%d_set1_pd"%registerSizeBits
-                _floatType = "__m%dd"%registerSizeBits
+                if( self.registerSizeBits == 128 ):
+                    functionName = "_mm_set1_pd"
+                else:
+                    functionName = "_mm%d_set1_pd"%self.registerSizeBits
+                _floatType = "__m%dd"%self.registerSizeBits
 
             self.code += self.indent + "%s %s = %s(%s);\n"%(_floatType, name,functionName,value)
         return self.code + "\n"
