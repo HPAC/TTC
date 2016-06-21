@@ -506,6 +506,8 @@ class cuda_transpose:
              if(idx != len(self.size)-1):
 		 transposeName +="x"
 
+        if( not self.isBeta ):
+           transposeName +="_bz"
 
         if(len(self.size) != 1):
 	   if(device):
