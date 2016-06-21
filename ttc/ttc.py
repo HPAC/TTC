@@ -604,8 +604,9 @@ def insertIntoVariant(cursor, blockA, blockB, prefetchDistance,
 
 def generateTransposition( ttcArgs ):
 
-    compiler_version = ttc_util.getCompilerVersion(ttcArgs.compiler)
-
+    ###########################################
+    # sanity checks and defaults
+    ###########################################
     if( ttcArgs.architecture != "cuda" and ttcArgs.architecture != "avx" and ttcArgs.floatTypeA != ttcArgs.floatTypeB):
         print FAIL + "[TTC] ERROR: Mixed precision is currently only supported for avx-enabled processors." + ENDC
         exit(-1)
@@ -615,6 +616,10 @@ def generateTransposition( ttcArgs ):
     if( (ttcArgs.architecture == "knc" or ttcArgs.architecture == "power") and ttcArgs.floatTypeA != "float"):
         print FAIL + "[TTC] ERROR: the selected architecture doesn't support the selected precision yet." + ENDC
         exit(-1)
+
+    if(ttcArgs.architecture == "cuda"):
+        print WARNING+"[TTC] WARNING: cuda architecture seleced -> switching compiler to nvcc." + ENDC
+        ttcArgs.compiler = "nvcc"
 
     if ttcArgs.maxNumImplementations == -1:
         ttcArgs.maxNumImplementations = 10000000
@@ -640,10 +645,13 @@ def generateTransposition( ttcArgs ):
     _noTest = 0
     _database = _ttc_root+"/ttc.db"
 
+
     if(len (ttcArgs.lda) == 0):
         ttcArgs.lda = []
     if(len (ttcArgs.ldb) == 0):
         ttcArgs.ldb = []
+
+    compiler_version = ttc_util.getCompilerVersion(ttcArgs.compiler)
 
     ###########################################
     # fuse indices
