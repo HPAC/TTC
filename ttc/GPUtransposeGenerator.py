@@ -305,12 +305,11 @@ class GPUtransposeGenerator:
        code += "#include <cuComplex.h>\n"
        code += "#include <complex.h>\n"
        code += "#include <stdio.h>\n\n"
-       code += implementation.getHostCall(1)
-       code += implementation.getCudaImplementation(1)
        if(self.perm[0] !=0):
           code += implementation.getSharedTransposeKernel()
-          #if(self.remainderA != 0 or self.remainderB != 0):
           code += implementation.getRemainderTransposeKernel(32)
+       code += implementation.getCudaImplementation(1)
+       code += implementation.getHostCall(1)
 
        return code
 		

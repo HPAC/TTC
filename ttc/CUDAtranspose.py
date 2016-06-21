@@ -416,14 +416,14 @@ class cuda_transpose:
         code += "\n\n"
 
 	if(self.isBeta):
-	    code += "   %s<<<numBlocks,%d>>>(A,B,alpha,beta,d_size,d_lda,d_ldb);\n"%(self.getHeaderName(1), self.vectorLength)
+	    code += "   %s<<<numBlocks,%d>>>(A,B,alpha,beta,d_size,d_lda,d_ldb);\n"%(self.getHeaderName(1, fastestVersion), self.vectorLength)
 	else:
-	    code += "   %s<<<numBlocks,%d>>>(A,B,alpha,d_size,d_lda,d_ldb);\n"%(self.getHeaderName(1), self.vectorLength)
+	    code += "   %s<<<numBlocks,%d>>>(A,B,alpha,d_size,d_lda,d_ldb);\n"%(self.getHeaderName(1, fastestVersion), self.vectorLength)
 	code += "   cudaDeviceSynchronize();\n\n"
-        code +=  ttc_util.getCudaErrorChecking("   ", self.getHeaderName(1))
-	code += "    cudaFree(d_size);\n"
-	code += "    cudaFree(d_lda);\n"
-	code += "    cudaFree(d_ldb);\n"
+        code +=  ttc_util.getCudaErrorChecking("   ", self.getHeaderName(1, fastestVersion))
+	code += "   cudaFree(d_size);\n"
+	code += "   cudaFree(d_lda);\n"
+	code += "   cudaFree(d_ldb);\n"
         code += "}\n" 
 
 	return code
@@ -444,9 +444,9 @@ class cuda_transpose:
  
 	
         if(self.isBeta):
-           code +="%s %s( %s *A, %s *B, const %s alpha, const %s beta, const int *size, const int *lda, const int *ldb)"%(functionType, self.getHeaderName(device,fastestVersion), self.floatTypeA,self.floatTypeB,self.alphaFloatType,self.betaFloatType)
+           code +="%s %s( const %s *A, %s *B, const %s alpha, const %s beta, const int *size, const int *lda, const int *ldb)"%(functionType, self.getHeaderName(device,fastestVersion), self.floatTypeA,self.floatTypeB,self.alphaFloatType,self.betaFloatType)
         else:
-           code +="%s %s( %s *A, %s *B, const %s alpha, const int *size, const int *lda, const int *ldb)"%(functionType, self.getHeaderName(device, fastestVersion), self.floatTypeA,self.floatTypeB,self.alphaFloatType)
+           code +="%s %s( const %s *A, %s *B, const %s alpha, const int *size, const int *lda, const int *ldb)"%(functionType, self.getHeaderName(device, fastestVersion), self.floatTypeA,self.floatTypeB,self.alphaFloatType)
         		
 	return code
 
