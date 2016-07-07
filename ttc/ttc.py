@@ -618,7 +618,7 @@ def generateTransposition( ttcArgs ):
         exit(-1)
 
     if(ttcArgs.architecture == "cuda"):
-        print WARNING+"[TTC] WARNING: cuda architecture seleced -> switching compiler to nvcc." + ENDC
+        print WARNING+"[TTC] WARNING: cuda architecture seletced -> switching compiler to nvcc." + ENDC
         ttcArgs.compiler = "nvcc"
 
     if ttcArgs.maxNumImplementations == -1:
@@ -628,7 +628,7 @@ def generateTransposition( ttcArgs ):
     if( os.environ.has_key('TTC_ROOT') ):
         _ttc_root = os.environ['TTC_ROOT']
     else:
-        print FAIL + "[TTC] ERROR: TTC_ROOT environment variable not set. Make sure that this variable points to the directory containing 'ttc.py'" + ENDC
+        print FAIL + "[TTC] ERROR: TTC_ROOT environment variable not set. Make sure that this variable points to the directory containing 'setup.py'" + ENDC
         exit(-1)
 
     _ttc_root += "/ttc"
