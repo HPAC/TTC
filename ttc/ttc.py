@@ -652,6 +652,13 @@ def generateTransposition( ttcArgs ):
         ttcArgs.ldb = []
 
     compiler_version = ttc_util.getCompilerVersion(ttcArgs.compiler)
+    if( compiler_version == -1 ):
+        if( ttcArgs.compiler == "icpc" ): #try to recover and switch to g++
+            ttcArgs.compiler = "g++"
+            compiler_version = ttc_util.getCompilerVersion(ttcArgs.compiler)
+            if( compiler_version == -1 ):
+                print "ERROR: compiler not found"
+                exit(-1)
 
     ###########################################
     # fuse indices

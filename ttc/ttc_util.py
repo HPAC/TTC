@@ -263,8 +263,7 @@ def getCompilerVersion(compiler):
         proc = subprocess.Popen([comp, version],stdout=subprocess.PIPE)
         proc.wait()
     except OSError:
-        print FAIL + "[TTC] ERROR: compiler '%s' not known. Please select a different compiler via --compiler=... "%comp +ENDC
-        exit(-1)
+        return -1
 
     output = proc.communicate()[0].split("\n")
     return output[0]
