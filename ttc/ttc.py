@@ -172,6 +172,8 @@ def printHelp():
     print ""
     print "Example: \"ttc --perm=1,0,2 --size=1000,768,16 --beta=1.0 --dataType=s\""
     print "This will swap indices 0 and 1 while leaving index 2 in place.\n"
+    version = ttc_util.getVersion()
+    print "Version:".ljust(20) + "v%d.%d.%d"%(version[0],version[1],version[2])
 
 def getInfoAboutVersion(version):
     tokens = version.split("_")
@@ -772,6 +774,8 @@ def generateTransposition( ttcArgs ):
             print "thread affinity: ".ljust(20)+"KMP_AFFINITY=%s"%ttcArgs.affinity
         print "Compiler: ".ljust(20) + ttc_util.getCompilerVersion(ttcArgs.compiler)
         print "Tempory directory:".ljust(20) + "ttc/"+tmpDirectory
+        version = ttc_util.getVersion()
+        print "Version:".ljust(20) + "v%d.%d.%d"%(version[0],version[1],version[2])
         print "-------------------------------------------"
 
     ###########################################

@@ -13,12 +13,14 @@ transposition, and
 <img src=https://github.com/HPAC/TTC/blob/master/misc/beta.png height=16px/> being scalars
 (i.e., setting <img src=https://github.com/HPAC/TTC/blob/master/misc/beta.png height=16px/> != 0 enables the user to update the output tensor B).
 
+Current version: **v0.1.0**
+
 # Key Features
 --------------
 
 * Generates parallelized and vectorized code
 * Support for multiple instruction sets: **AVX, AVX2, AVX512, KNC, CUDA**
-* Support for all datatypes (i.e., single, double, single-complex and double-comlex)
+* Support for all datatypes (i.e., single, double, single-complex and double-complex)
 * Support for **mixed precision** (i.e., different data types for A and B)
     * For instance, this feature can be used to generate a mixed-precision BLAS
 * Support for multiple leading dimensions in both A and B
@@ -30,29 +32,22 @@ transposition, and
 # Install
 ---------
 
-Create a directory where you want to install TTC:
+1. Clone the repository into a desired directory and change to that location:
 
-    mkdir /path/to/ttc
+    git clone https://github.com/HPAC/TTC.git
+    cd TTC
 
-Make sure that you export the TTC_ROOT environment variable (add to your .bashrc):
+2. Install TTC:
 
-    export TTC_ROOT=/path/to/ttc
-
-Clone the repository into the newly created directory:
-
-    git clone https://github.com/HPAC/TTC.git $TTC_ROOT
-
-Install TTC:
-
-    cd $TTC_ROOT
     python setup.py install --user
 
-Make sure that the installed script can be found in your path. You might have to
+3. Make sure that you export the TTC_ROOT environment variable (add to your .bashrc):
+
+    export TTC_ROOT=`pwd`
+
+4. You might have to add the installed location to your PATH environment variable:
    
     export PATH=$PATH:~/.local/bin
-
-to make TTC available.    
-
 
 
 # Getting Started
@@ -67,8 +62,9 @@ Here is one exemplary input to TTC:
 # Requirements
 --------------
 
-You have to have a working C compiler. I have tested TTC with:
+You must have a working C compiler. I have tested TTC with:
 
+* Python (tested with v2.7.5 and v2.7.9)
 * GCC (>= 4.8)
 * Intel's ICC (>= 15.0)
 
@@ -85,6 +81,7 @@ The benchmark uses a default tensor size of 200 MiB (see _sizeMB variable)
 
 # Citation
 -----------
+
 In case you want refer to TTC as part of a research paper, please cite the following
 article [(pdf)](http://arxiv.org/pdf/1603.02297v1):
 ```
@@ -104,6 +101,7 @@ article [(pdf)](http://arxiv.org/pdf/1603.02297v1):
 
 # Feedback & Contributions
 -----------
+
 We are happy for any feedback or feature requests. Please contact springer@aices.rwth-aachen.de.
 
 We also welcome any contributions to the code base.

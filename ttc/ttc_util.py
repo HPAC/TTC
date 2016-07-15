@@ -7,6 +7,9 @@ FAIL = '\033[91m'
 WARNING = '\033[93m'
 ENDC = '\033[0m'
 
+def getVersion():
+    return [0,1,0]
+
 def createTmpDirectory():
     directory = "tmp"
     i = 0
