@@ -778,6 +778,7 @@ def generateTransposition( ttcArgs ):
         print "Compiler: ".ljust(20) + ttc_util.getCompilerVersion(ttcArgs.compiler)
         print "Tempory directory:".ljust(20) + "${TTC_ROOT}/ttc/"+tmpDirectory
         version = ttc_util.getVersion()
+        print "Beta:".ljust(20) + "%f"%(ttcArgs.beta)
         print "Version:".ljust(20) + "v%d.%d.%d"%(version[0],version[1],version[2])
         print "-------------------------------------------"
 
