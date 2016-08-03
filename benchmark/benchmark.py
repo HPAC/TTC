@@ -17,7 +17,6 @@ if len(sys.argv) < 2:
 # Default settings
 ######################
 _floatType = "float"
-_alpha = 1.0
 _beta = 1.0
 _numThreads = int(sys.argv[1])
 _minBlock = 16
@@ -47,9 +46,9 @@ _permutations = [
 
 
 
-_genString = "ttc --alpha=%f --beta=%f --maxImplementations=200 --numThreads=%d --compiler=icpc --architecture=avx"%(_alpha,_beta,_numThreads)
+_genString = "ttc --beta=%f --maxImplementations=500 --numThreads=%d --compiler=icpc --architecture=avx"%(_beta,_numThreads)
 
-def output(size, perm):
+def output(size, perm, fileHandle):
         sizeStr = ""
         for s in size:
             sizeStr += str(s)+","
@@ -58,9 +57,11 @@ def output(size, perm):
         for s in perm:
             permStr += str(s)+","
         permStr = permStr[0:-1] #delete last ','
-        print _genString +" --size="+sizeStr + " --perm="+permStr  
+        fileHandle.write(_genString +" --size="+sizeStr + " --perm="+permStr+"\n")
+        print permStr, "&", sizeStr
 
 
+fileHandle = open("benchmark.sh","w")
 
 for dim in range(2,7):
 
@@ -102,7 +103,7 @@ for dim in range(2,7):
             sizeTmp[perm[0]] += (_leadingDimMultiple - sizeTmp[perm[0]]%_leadingDimMultiple)
 
         ### 1) everything pretty equal
-        output(sizeTmp, perm)
+        output(sizeTmp, perm, fileHandle)
 
         if dim >= 6:
             scewFactor = 3
@@ -127,7 +128,7 @@ for dim in range(2,7):
         if( sizeTmp[perm[0]] % _leadingDimMultiple != 0):
             sizeTmp[perm[0]] += (_leadingDimMultiple - sizeTmp[perm[0]]%_leadingDimMultiple)
 
-        output(sizeTmp, perm)
+        output(sizeTmp, perm, fileHandle)
 
         ### 3) skewed in perm[0]-dim
         sizeTmp = copy.deepcopy(size) #restore old size
@@ -155,8 +156,9 @@ for dim in range(2,7):
         if( sizeTmp[perm[0]] % _leadingDimMultiple != 0):
             sizeTmp[perm[0]] += (_leadingDimMultiple - sizeTmp[perm[0]]%_leadingDimMultiple)
 
-        output(sizeTmp, perm)
+        output(sizeTmp, perm, fileHandle)
 
+fileHandle.close()
 
 
 
