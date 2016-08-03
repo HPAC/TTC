@@ -8,10 +8,24 @@ import copy
 # The generated transpositions differ in: Size, dimensionality and order.
 # The permutations are choosen such that no index can be fused.
  
-if len(sys.argv) < 2:
-    print "usage: <number of threads>"
+if len(sys.argv) < 3:
+    print "usage: <number of threads> <thread affinity> <compiler>"
+    print ""
+    print "thread affinity:"
+    print "   The thread affinity needs to specified for the given system because it can effect the performance severely."
+    print "   Thes specified value respectively sets the 'KMP_AFFINITY' or 'GOMP_CPU_AFFINITY' environment variable for Intel's ICPC or g++."
+    print "   Examples:"
+    print "     ICPC: 'compact,1'"
+    print "     g++: '0,1,2,3'"
+    print ""
+    print "compiler: this value can be either 'g++' or 'icpc'"
+    print ""
+    print "Example: 'python benchmark.py 24 compact,1 icpc'"
+    print "Example: 'python benchmark.py 2 0,2 g++'"
     exit(0)
 
+_affinity = sys.argv[2]
+_compiler = sys.argv[3]
 
 #######################
 # Default settings
@@ -46,7 +60,7 @@ _permutations = [
 
 
 
-_genString = "ttc --beta=%f --maxImplementations=500 --numThreads=%d --compiler=icpc --architecture=avx"%(_beta,_numThreads)
+_genString = "ttc --beta=%f --maxImplementations=500 --numThreads=%d --compiler=%s --architecture=avx --affinity=%s"%(_beta,_numThreads,_compiler,_affinity)
 
 def output(size, perm, fileHandle):
         sizeStr = ""

@@ -134,10 +134,13 @@ def printHelp():
     print "   --beta=<value>".ljust(60),"beta value (default: 0.0)"
     print "   --compiler=[g++,icpc,ibm,nvcc]".ljust(60),"choose compiler (default: icpc)"
     print "   --numThreads=<value>".ljust(60),"number of threads to launch"
-    print """   --affinity=<text>".ljust(60),"thread affinity (default: 'granularity=fine,compact,1,0')
-    The value of this command-line argument sets the value for the KMP_AFFINITY or the GOMP_CPU_AFFINITY environment variable for icpc or g++ compiler, respectively.
-    For instance, using --compiler=icpc _and_ --affinity=compact,1 will set KMP_AFFINITY=compact,1.
-    Similarly, using --compiler=g++ _and_ --affinity=0-4 will set GOMP_CPU_AFFINITY=0-4."""
+    print """   --affinity=<text>".ljust(60),"thread affinity (WARNING: this
+    value should to be specified by the user explicityly because it can effect
+    performance severely and the optimal choice depends on the
+    enumeration/numbering of the cores on your system)
+    The thread affinity respectively sets the value for the 'KMP_AFFINITY' or the 'GOMP_CPU_AFFINITY' environment variable for icpc or g++ compiler.
+       For instance, using --compiler=icpc _and_ --affinity=compact,1 will set 'KMP_AFFINITY=compact,1'.
+       Similarly, using --compiler=g++ _and_ --affinity=0-4 will set 'GOMP_CPU_AFFINITY=0-4'."""
     print """   --dataType=[s,d,c,z,sd,ds,cz,zc]".ljust(60),"select the datatype: 
     's' : single-precision (default),  
     'd' : double-precision, 
@@ -682,7 +685,7 @@ def generateTransposition( ttcArgs ):
 
     if( ttcArgs.affinity == "" and ttcArgs.compiler != "nvcc"):
         if(ttcArgs.compiler == "g++" ):
-            ttcArgs.affinity = "0-23:2 1-24:2"
+            ttcArgs.affinity = "0-%d"%multiprocessing.cpu_count()
             print WARNING + "WARNING: you did not specify an thread affinity. We are using: GOMP_CPU_AFFINITY=%s by default"%ttcArgs.affinity +ENDC
             print WARNING + "WARNING: The default thread affinity might be suboptimal depending on the numbering of your CPU cores. We recommend using a ''compact'' thread affinity even for g++ (i.e., simulate KMP_AFFINITY=compact)."+ENDC
         else:
@@ -773,7 +776,7 @@ def generateTransposition( ttcArgs ):
         else:
             print "thread affinity: ".ljust(20)+"KMP_AFFINITY=%s"%ttcArgs.affinity
         print "Compiler: ".ljust(20) + ttc_util.getCompilerVersion(ttcArgs.compiler)
-        print "Tempory directory:".ljust(20) + "ttc/"+tmpDirectory
+        print "Tempory directory:".ljust(20) + "${TTC_ROOT}/ttc/"+tmpDirectory
         version = ttc_util.getVersion()
         print "Version:".ljust(20) + "v%d.%d.%d"%(version[0],version[1],version[2])
         print "-------------------------------------------"
@@ -1122,7 +1125,8 @@ def main():
             "--numThreads", "--generateOnly","--prefetchDistances", "--keep",
             "--updateDatabase","--dontCompile","-v", "--blockings",
             "--noTest","--no-align","--no-vec","--mpi", "--architecture",
-            "--affinity","--lda", "--ldb", "--ignoreDatabase", "--threadsPerBlock", "--hotA", "--hotB"]
+            "--affinity","--lda", "--ldb", "--ignoreDatabase",
+            "--threadsPerBlock", "--hotA", "--hotB","--verbose"]
 
     _hotA = 0
     _hotB = 0
