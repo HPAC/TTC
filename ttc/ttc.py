@@ -147,7 +147,8 @@ def printHelp():
     'c' : complex, 
     'z' : doubleComplex,
     'sd', 'ds', 'cz', 'zc': mixed precision; 'xy' denotes that the input tensor and output tensor respectively use the data type 'x' and 'y'."""
-    print "   --use-streamingStores".ljust(60),"enables streaming stores. Default: don't use streaming stores."
+    print "   --streamingStores".ljust(60),"enables streaming stores.  Default: no streaming stores."
+    print "        Streaming stores can increase the performance in the case of beta=0 but the resulting tensor will _not_ reside in cache, thus this optimization should be used with caution."
     print "   --prefetchDistances=<value>[,<value>, ...]".ljust(60),"number of blocks ahead of the current block. Default: 5"
     print "   --blockings=<value>x<value>[,<value>x<value>, ...]".ljust(60),"available blockings (default: all)"
     print "   --verbose or -v".ljust(60),"prints compiler output"
@@ -1121,8 +1122,9 @@ def generateTransposition( ttcArgs ):
 
 def main():
 
-    _allowedArguments = [ "--compiler","--use-streamingStores","--maxImplementations",
-            "--help","--alpha","--beta","--papi","--size","--perm", "--loopPerm","--dataType",
+    _allowedArguments = [ "--compiler","--streamingStores","--use-streamingStores","--maxImplementations",
+            "--help","--alpha","--beta","--papi","--size","--perm",
+            "--loopPerm","--floatType", "--dataType",
             "--numThreads", "--generateOnly","--prefetchDistances", "--keep",
             "--updateDatabase","--dontCompile","-v", "--blockings",
             "--noTest","--no-align","--no-vec","--mpi", "--architecture",
@@ -1194,7 +1196,7 @@ def main():
             _noTest = 1
         if arg == "--updateDatabase":
             _updateDatabase = 1
-        if arg == "--use-streamingStores":
+        if arg == "--use-streamingStores" or arg == "--streamingStores":
             _streamingStores = 1
         if arg == "-v":
             _debug = 1
@@ -1239,7 +1241,7 @@ def main():
             else:
                 print FAIL + "[TTC] ERROR: unknown compiler choice." + ENDC
                 exit(-1)
-        if arg.find("--dataType=") != -1:
+        if (arg.find("--dataType=") != -1 or arg.find("--floatType=") != -1):
             if( arg.split("=")[1] == "s" ):
                 _floatTypeA = "float"
                 _floatTypeB = "float"

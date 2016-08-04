@@ -170,9 +170,12 @@ class transposeGenerator:
 
         
         #generate scalar version as reference
+        optRef = ""
+        if( self.streamingStoresApplicable() ):
+            optRef = "streamingstore"
         self.referenceImplementation = transpose.implementation((1,1),
                 perm[-1::-1], self.perm, self.size, self.alpha, self.beta,
-                self.floatTypeA, self.floatTypeB, "",  1, 0,(1,1),1, self.architecture, parallelize)
+                self.floatTypeA, self.floatTypeB, optRef,  1, 0,(1,1),1, self.architecture, parallelize)
 
         self.minImplementationsPerFile = 64
         self.maxImplementationsPerFile = 256
@@ -272,15 +275,25 @@ class transposeGenerator:
         self.printMain()
         self.generateImplementations()
             
-    def getAppropriateOptimizations(self):
-        optimizations = [""]
-
-        # streaming-stores
+    def streamingStoresApplicable(self, blockingB = 0):
         if( self.streamingStores == 1 and self.beta == 0 ):
             applicable = 1
-            
             if( self.aligned ):
-                optimizations.append("streamingstore")
+                if( blockingB == 0):
+                    return 1
+                else:
+                    if( self.perm[0] == 1 and (blockingB * self.floatSizeB) % self.cacheLineSize != 0 ):
+                        return 0
+                    else:
+                        return 1
+        return 0
+
+    def getAppropriateOptimizations(self):
+        optimizations = [""] #TODO, this doesn't seem to be needed if streamingstores are applicable
+
+        # streaming-stores
+        if( self.streamingStoresApplicable() ):
+            optimizations.append("streamingstore")
 
         return optimizations
 
@@ -295,7 +308,6 @@ class transposeGenerator:
 
         optimizations = self.getAppropriateOptimizations()
 
-
         counter = 0
         #generate all implementations
         for prefetchDistance in self.prefetchDistances:
@@ -304,6 +316,10 @@ class transposeGenerator:
                     
                     for opt in optimizations:
                     
+                        if( opt == "streamingstore" and not self.streamingStoresApplicable(blocking[1]) ):
+                            #skip this optimization if the blocking in B is not a multiple of the cacheLineSize
+                            continue
+
                         counter += 1
                         if( self.silent != 1):
                             sys.stdout.write("[TTC] Implementations generated so far: %d                    \r"%counter)
@@ -957,7 +973,7 @@ class transposeGenerator:
 
         return code + "\n"
 
-    def getStoreKernel(self, reg, offset, streamingStore = 0):
+    def getStoreKernel(self, reg, offset):
         code = self.indent +"//Store B\n"
         maxRange = self.registerSizeBits / 8 / self.floatSizeA
         cast = ""
@@ -967,22 +983,13 @@ class transposeGenerator:
                 post = "pd"
 
             if( self.aligned ):
-                if( streamingStore ):
-                    if( self.floatSizeB < self.floatSizeA ): # mixed precision 
-                        functionName = "_mm_stream_%s"%(post)
-                    else:
-                       if( self.registerSizeBits == 128 ):
-                          functionName = "_mm_stream_%s"%(post)
-                       else:
-                          functionName = "_mm%d_stream_%s"%(self.registerSizeBits,post)
+                if( self.floatSizeB < self.floatSizeA ): # mixed precision 
+                    functionName = "_mm_store_%s"%(post)
                 else:
-                    if( self.floatSizeB < self.floatSizeA ): # mixed precision 
-                        functionName = "_mm_store_%s"%(post)
-                    else:
-                       if( self.registerSizeBits == 128 ):
-                          functionName = "_mm_store_%s"%(post)
-                       else:
-                          functionName = "_mm%d_store_%s"%(self.registerSizeBits,post)
+                   if( self.registerSizeBits == 128 ):
+                      functionName = "_mm_store_%s"%(post)
+                   else:
+                      functionName = "_mm%d_store_%s"%(self.registerSizeBits,post)
             else:
                 if( self.floatSizeB < self.floatSizeA ): # mixed precision 
                     functionName = "_mm_storeu_%s"%(post)
@@ -1144,7 +1151,7 @@ class transposeGenerator:
                     return code +static+"void %s(const %s* __restrict__ A, int lda1, const int lda, %s* __restrict__ B, const int ldb1, const int ldb%s)\n{\n"%(transposeMicroKernelname, self.floatTypeA, self.floatTypeB,self.getBroadcastVariables(1))
 
 
-    def getUpdateAndStore(self, streamingStores = 0):
+    def getUpdateAndStore(self):
 
         numIterations = 1
         if( self.floatTypeA.find("float") != -1 and self.floatTypeB.find("double") != -1):
@@ -1169,17 +1176,17 @@ class transposeGenerator:
                             code += self.getFmaKernel("rowB%d"%i, "reg_beta", "_mm256_extractf128_ps(rowA%d, 0x1)"%i, "rowB%d"%i)
                     else:
                         code += self.getFmaKernel("rowB%d"%i, "reg_beta", "rowA%d"%i, "rowB%d"%i)
-                code += self.getStoreKernel("rowB#", offset, streamingStores )
+                code += self.getStoreKernel("rowB#", offset)
             else:
                 if( self.floatTypeA.find("float") != -1 and self.floatTypeB.find("double") != -1): #mixed precision
                     if( iteration == 0):
-                        code += self.getStoreKernel("_mm256_cvtps_pd(_mm256_castps256_ps128(rowA#))", offset, streamingStores )
+                        code += self.getStoreKernel("_mm256_cvtps_pd(_mm256_castps256_ps128(rowA#))", offset)
                     else:
-                        code += self.getStoreKernel("_mm256_cvtps_pd(_mm256_extractf128_ps(rowA#, 0x1))", offset, streamingStores )
+                        code += self.getStoreKernel("_mm256_cvtps_pd(_mm256_extractf128_ps(rowA#, 0x1))", offset)
                 elif( self.floatTypeA.find("double") != -1 and self.floatTypeB.find("float") != -1): #mixed precision
-                    code += self.getStoreKernel("_mm256_cvtpd_ps(rowA#)", offset, streamingStores )
+                    code += self.getStoreKernel("_mm256_cvtpd_ps(rowA#)", offset)
                 else:
-                    code += self.getStoreKernel("rowA#", offset, streamingStores )
+                    code += self.getStoreKernel("rowA#", offset)
 
         return code
 
@@ -1243,15 +1250,18 @@ class transposeGenerator:
 
        return code
 
+
     def generateTranspositionKernel(self, blockings, prefetchDistances, staticAndInline=0, optimizations = []):
+        # This function generates the transpose.cpp file (_not_ the transpose%d.cpp files)
+
         loadKernelA = self.getLoadKernel("A","lda", self.floatTypeA, 0, 0, 1)
 
-        ret = ""
         retHPP = ""
+        ret = ""
+
         #generate DxD micro kernel
         for opt in optimizations:
             if( self.perm[0] != 0 ):
-                #we use the same micro kernel in this case
                 code = self.getMicroKernelHeader(self.microBlocking[0], opt, 0, staticAndInline)   
                 retHPP += code.split("\n")[1]+";\n"
                 if( self.scalar != 0 ):
@@ -1264,7 +1274,7 @@ class transposeGenerator:
                 else:
                     code += loadKernelA
                     code += self.microBlocking[1]
-                    code += self.getUpdateAndStore(opt)
+                    code += self.getUpdateAndStore()
                 code += "}\n"
                 ret += code
 
@@ -1282,6 +1292,9 @@ class transposeGenerator:
                 for prefetchDistance in prefetchDistances:
                     # generate arbitrary blockings based on the DxD micro kernel
                     for blocking in blockings:
+                        if( opt == "streamingstore" and (not self.streamingStoresApplicable(blocking[1])) ):
+                            continue #skip this blocking if necessary
+
                         if ( blocking[0] % blockA == 0 and blocking[1] % blockB == 0 and
                                 (blocking[0] / blockA > 1 or blocking[1] / blockB > 1 or
                                     prefetchDistance > 0)):
@@ -1291,6 +1304,8 @@ class transposeGenerator:
                             #replicate the micro-transpose to build the bigger transpose
                             numBlocksA = blocking[0] / blockA
                             numBlocksB = blocking[1] / blockB
+                            if( opt == "streamingstore"):
+                                code += self.indent + "%s B_buffer[%d * %d] __attribute__((aligned(%d)));\n"%(self.floatTypeB, blocking[0], blocking[1],self.cacheLineSize)
                             for i in range(numBlocksA):
                                 for j in range(numBlocksB):
             
@@ -1323,9 +1338,6 @@ class transposeGenerator:
                                                 numBlocksB, prefetchDistance, opt)
                                     transposeName = "transpose%dx%d"%(blockA, blockB)
 
-                                    if( opt != ""):
-                                        transposeName += "_" + opt
-
                                     if( staticAndInline ):
                                         transposeName += "_"
                                         for p in self.perm:
@@ -1338,7 +1350,37 @@ class transposeGenerator:
                                                  transposeName +="x"
 
                                     code += self.indent + "//invoke micro-transpose\n"
-                                    code += self.indent + "%s(A%s, lda, B%s, ldb%s);\n\n"%(transposeName, offsetA, offsetB,self.getBroadcastVariables(0))
+                                    if( opt == "streamingstore"):
+                                        code += self.indent + "%s(A%s, lda, B_buffer%s, %d%s);\n\n"%(transposeName, offsetA, offsetB.replace("ldb","%d"%blocking[1]),blocking[1],self.getBroadcastVariables(0))
+                                    else:
+                                        code += self.indent + "%s(A%s, lda, B%s, ldb%s);\n\n"%(transposeName, offsetA, offsetB,self.getBroadcastVariables(0))
+
+                            if( opt == "streamingstore"):
+                                elementsPerRegister = self.registerSizeBits / 8 / self.floatSizeB
+                                code += self.indent + "// write buffer to main-memory via non-temporal stores\n"
+                                code += self.indent + "for( int i = 0; i < %d; i++){\n"%(blocking[0])
+                                if((blocking[1] * self.floatSizeB) % self.cacheLineSize != 0 ):
+                                    print blocking[1], self.floatSizeB,self.cacheLineSize
+                                    print "ERROR (internal): blockB is not a multiple of the cacheline size"
+                                    exit(-1)
+                                for j in range((blocking[1] / elementsPerRegister) ): #store one cacheline at a time
+                                    cast = ""
+                                    if( self.floatTypeB == "float complex" ):
+                                        cast = "(float*)"
+                                    elif( self.floatTypeB == "double complex" ):
+                                        cast = "(double*)"
+                                    post = "ps"
+                                    if( self.floatTypeB.find("double") != -1 ):
+                                        post = "pd"
+                                    if( self.registerSizeBits == 128 ):
+                                        functionNameStream = "_mm_stream_%s"%post
+                                        functionNameLoad = "_mm_load_%s"%post
+                                    else:
+                                        functionNameStream = "_mm%d_stream_%s"%(self.registerSizeBits,post)
+                                        functionNameLoad = "_mm%d_load_%s"%(self.registerSizeBits,post)
+                                    code += self.indent + self.indent + "%s(%s(B + i * ldb + %d), %s(%s(B_buffer + i * %d + %d)));\n"%(functionNameStream, cast, j *
+                                            elementsPerRegister, functionNameLoad, cast, blocking[1], j * elementsPerRegister)
+                                code += self.indent + "}\n"
 
 
                             code += "}\n"
@@ -1359,6 +1401,8 @@ class transposeGenerator:
                     code += indent + "for(int ib = 0; ib < %d; ib++)\n"%(blocking[1])
                     indent += self.indent
                     if self.architecture != "power":
+                        if( opt == "streamingstore" ):
+                            code += indent + "#pragma vector nontemporal\n"
                         code += indent + "#pragma omp simd\n"
                     if( staticAndInline ):
                         code += indent + "for(int i0 = 0; i0 < size0; i0++)\n"

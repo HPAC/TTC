@@ -136,6 +136,8 @@ class implementation:
         loopIdx = loopPerm[0]
         increment = 1
         if len(loopPerm) == 1: 
+            if( self.optimization == "streamingstore" ):
+                self.code += "#pragma vector nontemporal\n"
             self.code += "#pragma simd\n"
         self.code +=  "%sfor(int i%d = 0; i%d < size%d; i%d += %d)\n"%(indent,loopIdx,loopIdx,loopIdx,loopIdx,increment)
 
@@ -166,6 +168,9 @@ class implementation:
         else:#we reached the innermost loop, no recursion
             if( self.perm[0] == 0 ):
                 indent += self.indent
+                if( self.optimization == "streamingstore" ):
+                    self.code += "#pragma vector nontemporal\n"
+                self.code += "#pragma simd\n"
                 self.code +=  "%sfor(int i0 = 0; i0 < size0; i0++)\n"%(indent)
 
             #get input and output offsets correct
