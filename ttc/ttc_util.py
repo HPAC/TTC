@@ -8,7 +8,7 @@ WARNING = '\033[93m'
 ENDC = '\033[0m'
 
 def getVersion():
-    return [0,1,0]
+    return [0,1,1]
 
 def createTmpDirectory():
     directory = "tmp"
@@ -99,12 +99,38 @@ class TTCargs:
             dataType = 'zc'
         elif(self.floatTypeA == "float complex" and self.floatTypeB == "double complex"):
             dataType = 'cz'
+        streamingStores = ""
+        if( self.streamingStores ):
+            streamingStores = " --streamingStores"
+
         permStr = listToString(self.idxPerm)[1:-1]
         sizeStr = listToString(self.size)[1:-1]
-        ldaStr = listToString(self.lda)[1:-1]
-        ldbStr = listToString(self.ldb)[1:-1]
-        print "ttc --beta=%f --perm=%s --size=%s --architecture=%s --maxImplementations=%d --lda=%s --ldb=%s --compiler=%s --dataType=%s --numThreads=%d"%(self.beta, permStr, sizeStr, self.architecture, self.maxNumImplementations, ldaStr, ldbStr, self.compiler, dataType, self.numThreads)
+        ldaStr = ""
+        ldbStr = ""
+        if( len(self.lda) > 0 ):
+            ldaStr = "--lda=%s"%listToString(self.lda)[1:-1]
+        if( len(self.ldb) > 0 ):
+            ldbStr = "--ldb=%s"%listToString(self.ldb)[1:-1]
+        return "ttc --beta=%f --perm=%s --size=%s --architecture=%s --maxImplementations=%d %s %s --compiler=%s --dataType=%s --numThreads=%d%s"%(self.beta, permStr, sizeStr, self.architecture, self.maxNumImplementations, ldaStr, ldbStr, self.compiler, dataType, self.numThreads, streamingStores)
 
+
+def getFloatPrefix(floatTypeA, floatTypeB):
+    if(floatTypeA == "float" and floatTypeB == "float"):
+         return 's'
+    elif(floatTypeA == "double" and floatTypeB == "double"):
+         return 'd'
+    elif(floatTypeA == "double" and floatTypeB == "float"):
+         return 'ds'
+    elif(floatTypeA == "float" and floatTypeB == "double"):
+         return 'sd'
+    elif(floatTypeA == "float complex" and floatTypeB == "float complex"):
+         return 'c'
+    elif(floatTypeA == "double complex" and floatTypeB == "double complex"):
+         return 'z'
+    elif(floatTypeA == "double complex" and floatTypeB == "float complex"):
+         return 'zc'
+    elif(floatTypeA == "float complex" and floatTypeB == "double complex"):
+         return 'cz'
 
 def getCudaErrorChecking(indent, routine):
    tmpCode =indent+"{cudaError_t err = cudaGetLastError();\n"

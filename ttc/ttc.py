@@ -792,10 +792,11 @@ def generateTransposition( ttcArgs ):
     #create tables, if necessary
     createTables(cursor)
 
+    emitReference = 0
     fastestVersionBW = 0
     solutionFound = 0
     sizeId = sql_util.getSizeId(cursor, ttcArgs.size)
-    if(ttcArgs.ignoreDatabase == 0 and sizeId != -1): #TODO: also lookup streamingstore optimization
+    if(ttcArgs.ignoreDatabase == 0 and sizeId != -1):
         permId = sql_util.getPermId(cursor, ttcArgs.idxPerm)
         if(permId != -1):
             measurementId = sql_util.getMeasurementId(cursor, sizeId, permId,
@@ -817,10 +818,9 @@ def generateTransposition( ttcArgs ):
                     ret = sql_util.getLoopPermFrom(cursor, loopId, len(ttcArgs.size))
                     if( ttcArgs.idxPerm[0] == 0 ): #the first index will always be within our kernel (i.e., it will always be the inner-most loop)
                         ret.remove(0)
-                    elif( blockA == 1 and blockB == 1):
-                        blockA = 8 #quick bugfix (only happens if the reference version was the fastest implementation)
-                        blockB = 8 #quick bugfix
                     if( ret != -1 ): #we have found a solution
+                        if( blockA == 1 and blockB == 1):
+                            emitReference = 1
                         ttcArgs.blockings = [(blockA, blockB)]
                         solutionFound = 1
                         ttcArgs.loopPermutations = [ret]
@@ -848,10 +848,13 @@ def generateTransposition( ttcArgs ):
         generator = tg.transposeGenerator(ttcArgs.idxPerm, ttcArgs.loopPermutations, ttcArgs.size, ttcArgs.alpha, ttcArgs.beta,
                 ttcArgs.maxNumImplementations, ttcArgs.floatTypeA, ttcArgs.floatTypeB, _parallelize, ttcArgs.streamingStores,
                 ttcArgs.prefetchDistances, ttcArgs.blockings, _papi, _noTest, ttcArgs.scalar, ttcArgs.align,
-                ttcArgs.architecture, _mpi, ttcArgs.lda, ttcArgs.ldb, ttcArgs.silent, tmpDirectory, ttcArgs.hotA, ttcArgs.hotB )
+                ttcArgs.architecture, _mpi, ttcArgs.lda, ttcArgs.ldb,
+                ttcArgs.silent, tmpDirectory, ttcArgs.hotA, ttcArgs.hotB,
+                emitReference)
 
 
-    generator.generate()
+    if( not emitReference ):
+        generator.generate()
     numSolutions = generator.getNumSolutions() + 1#account for reference version
     if( ttcArgs.silent != 1):
         print "Generation of %d implementations took %f seconds "%(numSolutions,_time.time() - t0)
@@ -860,7 +863,6 @@ def generateTransposition( ttcArgs ):
     # copy makefile to tmp directory
     shutil.copyfile("../Makefile","./Makefile")
 
-    emitReference = 0
     measuringTime = 0
     compilationTime = 0
     if ttcArgs.generateOnly == 0:
@@ -1017,12 +1019,13 @@ def generateTransposition( ttcArgs ):
         ###########################################
         # save fastest version to file
         ###########################################
-        if( solutionFound == 1):
-            fastestVersion = generator.implementations[-1].getVersionName()
-        if( emitReference or numSolutions == 1):
+        if( emitReference or numSolutions == 1 ):
             code = generator.referenceImplementation.getImplementation(_parallelize, 1)
             transposeName = generator.referenceImplementation.getTransposeName(1)
-        else: 
+        elif( solutionFound == 1):
+            fastestVersion = generator.implementations[-1].getVersionName()
+        
+        if( not ( emitReference or numSolutions == 1 ) ):
             code = generator.generateVersion(fastestVersion)
         if( len(code) > 1):
             directory = workingDir +"/ttc_transpositions"

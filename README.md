@@ -13,7 +13,10 @@ transposition, and
 <img src=https://github.com/HPAC/TTC/blob/master/misc/beta.png height=16px/> being scalars
 (i.e., setting <img src=https://github.com/HPAC/TTC/blob/master/misc/beta.png height=16px/> != 0 enables the user to update the output tensor B).
 
-Current version: **v0.1.0**
+Please also have a look at [TTC-C](https://github.com/HPAC/TTC-C) which provides
+a C wrapper API for TTC.
+
+Current version: **v0.1.1**
 
 # Key Features
 --------------
@@ -83,7 +86,7 @@ The benchmark uses a default tensor size of 200 MiB (see _sizeMB variable)
 -----------
 
 In case you want refer to TTC as part of a research paper, please cite the following
-article [(pdf)](http://arxiv.org/pdf/1603.02297v1):
+article [(pdf)](http://arxiv.org/abs/1603.02297):
 ```
 @article{ttc2016a,
    author      = {Paul Springer and Jeff R. Hammond and Paolo Bientinesi},
@@ -97,6 +100,12 @@ article [(pdf)](http://arxiv.org/pdf/1603.02297v1):
    url         = {http://arxiv.org/abs/1603.02297}
 }
 ``` 
+
+# Changelog
+-----------
+V0.1.1:
+   * Improved performance for streaming stores (only applicable if beta=0)
+
 
 
 # Feedback & Contributions

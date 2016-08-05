@@ -40,7 +40,8 @@ ENDC = '\033[0m'
 class transposeGenerator:
     def __init__(self, perm, loopPermutations, size, alpha, beta, maxNumImplementations,
             floatTypeA, floatTypeB, parallelize, streamingStores, prefetchDistances, blockings, papi,
-            noTest, scalar, align, architecture, mpi, lda, ldb, silent, tmpDirectory, hotA = 0, hotB = 0):
+            noTest, scalar, align, architecture, mpi, lda, ldb, silent,
+            tmpDirectory, hotA = 0, hotB = 0, emitReference = 0):
 
 
         self.hotA = hotA
@@ -117,53 +118,54 @@ class transposeGenerator:
         maxA = minA * 4
         maxB = minB * 4
 
-        if( self.aligned != 1 and (self.architecture == "knc" or self.architecture == "power") ):
-            print WARNING + "WARNING: non-aligned is not yet supported for the specified architecture" + ENDC
-            print WARNING + "   => Fallback: use non-vectorized code." + ENDC
-            self.scalar = 1
-
         self.blockings = []
-        if( self.perm[0] == 0): 
-            if( len(blockings) == 0 ): #default, no blockings provided => use all blockings
-                if( len(self.size) == 1 ): #this is only the case if perm = IDENTITY _and_ lda and ldb are non-default
-                    self.blockings.append((1,1))
-                else:
-                    for i in range (1,11):
-                        for j in range (1,11):
-                            if( self.size[1] >= i and self.size[self.perm[1]] >= j ):
-                                self.blockings.append((i,j))
-        else:
-            if( len(blockings) == 0 ): #default, no blockings provided => use all blockings
-                for i in range (minA,maxA+1,minA):
-                    for j in range (minB,maxB+1,minB):
-                        if( self.size[0] >= i and self.size[self.perm[0]] >= j ):
-                            self.blockings.append((i,j))
+        if( not emitReference ):
+            if( self.aligned != 1 and (self.architecture == "knc" or self.architecture == "power") ):
+                print WARNING + "WARNING: non-aligned is not yet supported for the specified architecture" + ENDC
+                print WARNING + "   => Fallback: use non-vectorized code." + ENDC
+                self.scalar = 1
+
+            if( self.perm[0] == 0): 
+                if( len(blockings) == 0 ): #default, no blockings provided => use all blockings
+                    if( len(self.size) == 1 ): #this is only the case if perm = IDENTITY _and_ lda and ldb are non-default
+                        self.blockings.append((1,1))
+                    else:
+                        for i in range (1,11):
+                            for j in range (1,11):
+                                if( self.size[1] >= i and self.size[self.perm[1]] >= j ):
+                                    self.blockings.append((i,j))
             else:
-                for blocking in blockings:
-                    if( blocking[0] % minA != 0):
-                        print FAIL + "[TTC] ERROR: blocking in A (%d) is not a multiple of %d."%(blocking[0],minA) + ENDC
-                        exit(-1)
-                    if( blocking[1] % minB != 0):
-                        print FAIL + "[TTC] ERROR: blocking in B (%d) is not a multiple of %d."%(blocking[1],minB) + ENDC
-                        exit(-1)
+                if( len(blockings) == 0 ): #default, no blockings provided => use all blockings
+                    for i in range (minA,maxA+1,minA):
+                        for j in range (minB,maxB+1,minB):
+                            if( self.size[0] >= i and self.size[self.perm[0]] >= j ):
+                                self.blockings.append((i,j))
+                else:
+                    for blocking in blockings:
+                        if( blocking[0] % minA != 0):
+                            print FAIL + "[TTC] ERROR: blocking in A (%d) is not a multiple of %d."%(blocking[0],minA) + ENDC
+                            exit(-1)
+                        if( blocking[1] % minB != 0):
+                            print FAIL + "[TTC] ERROR: blocking in B (%d) is not a multiple of %d."%(blocking[1],minB) + ENDC
+                            exit(-1)
 
-                    if( self.size[0] >= blocking[0] and self.size[self.perm[0]] >= blocking[1] ):
-                        self.blockings.append(blocking)
+                        if( self.size[0] >= blocking[0] and self.size[self.perm[0]] >= blocking[1] ):
+                            self.blockings.append(blocking)
 
-        if( len(self.blockings) == 0): #this is needed to find solutions for which the size is smaller than the smallest blocking
-            self.blockings.append((minA,minB))
+            if( len(self.blockings) == 0): #this is needed to find solutions for which the size is smaller than the smallest blocking
+                self.blockings.append((minA,minB))
 
-        #sort blockings according to cost
-        tmpBlockings = []
-        for blocking in self.blockings:
-            tmpBlockings.append((blocking, self.getCostBlocking(blocking)))
-        
-        tmpBlockings.sort(key=lambda tup: tup[1])
-        tmpBlockings.reverse()
+            #sort blockings according to cost
+            tmpBlockings = []
+            for blocking in self.blockings:
+                tmpBlockings.append((blocking, self.getCostBlocking(blocking)))
+            
+            tmpBlockings.sort(key=lambda tup: tup[1])
+            tmpBlockings.reverse()
 
-        self.blockings = []
-        for (blocking, cost) in tmpBlockings:
-            self.blockings.append(blocking)
+            self.blockings = []
+            for (blocking, cost) in tmpBlockings:
+                self.blockings.append(blocking)
 
         self.implementations = []
         self.maxNumImplementations = maxNumImplementations 
@@ -277,23 +279,29 @@ class transposeGenerator:
             
     def streamingStoresApplicable(self, blockingB = 0):
         if( self.streamingStores == 1 and self.beta == 0 ):
-            applicable = 1
-            if( self.aligned ):
-                if( blockingB == 0):
-                    return 1
-                else:
-                    if( self.perm[0] == 1 and (blockingB * self.floatSizeB) % self.cacheLineSize != 0 ):
-                        return 0
-                    else:
+            if( self.perm[0] == 0 ):
+                return 1
+            else:
+                if( blockingB == 0 ):
+                    if( (self.size[self.perm[0]] * self.floatSizeB) % self.cacheLineSize == 0 ): #there exists one blocking which is a multiple of the cacheline size
                         return 1
+                    else:
+                        return 0
+                else:
+                    if( (blockingB * self.floatSizeB) % self.cacheLineSize == 0 ):
+                        return 1
+                    else:
+                        return 0
         return 0
 
     def getAppropriateOptimizations(self):
-        optimizations = [""] #TODO, this doesn't seem to be needed if streamingstores are applicable
+        optimizations = []
 
         # streaming-stores
         if( self.streamingStoresApplicable() ):
             optimizations.append("streamingstore")
+        else:
+            optimizations.append("")
 
         return optimizations
 
@@ -1057,7 +1065,10 @@ class transposeGenerator:
                     if( self.floatTypeA.find("double") != -1  and self.floatTypeB.find("float") != -1): #mixed precision
                         code += self.indent + "%s = _mm_add_ps( _mm_mul_ps(%s, %s), _mm256_cvtpd_ps(%s));\n"%(d,a,b,c)
                     else:
-                        code += self.indent + "%s = _mm256_add_ps( _mm256_mul_ps(%s, %s), %s);\n"%(d,a,b,c)
+                        if( self.registerSizeBits == 128 ):
+                            code += self.indent + "%s = _mm_add_ps( _mm_mul_ps(%s, %s), %s);\n"%(d,a,b,c)
+                        else:
+                            code += self.indent + "%s = _mm256_add_ps( _mm256_mul_ps(%s, %s), %s);\n"%(d,a,b,c)
             if( self.floatTypeB.find("double") != -1): 
                 if(  self.architecture == "avx512" or self.architecture == "knc" ): 
                     code += self.indent + "%s = _mm512_fmadd_pd( %s, %s, %s);\n"%(d,a,b,c)
@@ -1065,7 +1076,10 @@ class transposeGenerator:
                     if( self.floatTypeA.find("float") != -1): #mixed precision
                         code += self.indent + "%s = _mm256_add_pd( _mm256_mul_pd(%s, %s), _mm256_cvtps_pd((%s)));\n"%(d,a,b,c)
                     else:
-                        code += self.indent + "%s = _mm256_add_pd( _mm256_mul_pd(%s, %s), %s);\n"%(d,a,b,c)
+                        if( self.registerSizeBits == 128 ):
+                            code += self.indent + "%s = _mm_add_pd( _mm_mul_pd(%s, %s), %s);\n"%(d,a,b,c)
+                        else:
+                            code += self.indent + "%s = _mm256_add_pd( _mm256_mul_pd(%s, %s), %s);\n"%(d,a,b,c)
         return code
 
     def getBroadcastVariables(self, withType):
@@ -1115,40 +1129,42 @@ class transposeGenerator:
                 
         return code 
 
-    def getMicroKernelHeader(self,blocking, opt = "", prefetchDistance = 0, staticAndInline = 0):
+    def getMicroKernelHeader(self,blocking, prefetchDistance = 0, staticAndInline = 0):
         code = "//B_ji = alpha * A_ij + beta * B_ji\n"
-        transposeMicroKernelname = "transpose%dx%d"%(blocking[0], blocking[1])
+        transposeMicroKernelname = "%sTranspose%dx%d"%(ttc_util.getFloatPrefix(self.floatTypeA, self.floatTypeB),blocking[0], blocking[1])
+        if( self.perm[0] == 0):
+            transposeMicroKernelname += "_0"
 
-        if( opt != "" ):
-            transposeMicroKernelname += "_"+ opt
+        if( self.beta == 0 ):
+            transposeMicroKernelname += "_bz"
 
         if( prefetchDistance > 0):
             transposeMicroKernelname += "_prefetch_%d"%prefetchDistance
 
-        if( staticAndInline ):
-            transposeMicroKernelname += "_"
-            for i in self.perm:
-                transposeMicroKernelname += str(i)
+        #if( staticAndInline ):
+        #    transposeMicroKernelname += "_"
+        #    for i in self.perm:
+        #        transposeMicroKernelname += str(i)
   
-            transposeMicroKernelname +="_"
-            for idx in range(len(self.size)):
-                 transposeMicroKernelname += "%d"%(self.size[idx])
-                 if(idx != len(self.size)-1):
-                     transposeMicroKernelname +="x"
+        #    transposeMicroKernelname +="_"
+        #    for idx in range(len(self.size)):
+        #         transposeMicroKernelname += "%d"%(self.size[idx])
+        #         if(idx != len(self.size)-1):
+        #             transposeMicroKernelname +="x"
 
         static = ""
         if staticAndInline :
             static = "static INLINE "
         if( prefetchDistance > 0):
-            return code +static+"void %s(const %s* __restrict__ A, const int lda, %s* __restrict__ B, const int ldb, const %s* __restrict__ Anext0, %s* __restrict__ Bnext0, const %s* __restrict__ Anext1, %s* __restrict__ Bnext1%s)\n{\n"""%(transposeMicroKernelname, self.floatTypeA,self.floatTypeB, self.floatTypeA,self.floatTypeB, self.floatTypeA,self.floatTypeB,self.getBroadcastVariables(1))
+            return transposeMicroKernelname, code +static+"void %s(const %s* __restrict__ A, const int lda, %s* __restrict__ B, const int ldb, const %s* __restrict__ Anext0, %s* __restrict__ Bnext0, const %s* __restrict__ Anext1, %s* __restrict__ Bnext1%s)\n{\n"""%(transposeMicroKernelname, self.floatTypeA,self.floatTypeB, self.floatTypeA,self.floatTypeB, self.floatTypeA,self.floatTypeB,self.getBroadcastVariables(1))
         else:
             if( self.perm[0] != 0):
-                return code +static+"void %s(const %s* __restrict__ A, const int lda, %s* __restrict__ B, const int ldb%s)\n{\n"%(transposeMicroKernelname, self.floatTypeA, self.floatTypeB,self.getBroadcastVariables(1))
+                return transposeMicroKernelname, code +static+"void %s(const %s* __restrict__ A, const int lda, %s* __restrict__ B, const int ldb%s)\n{\n"%(transposeMicroKernelname, self.floatTypeA, self.floatTypeB,self.getBroadcastVariables(1))
             else:
                 if( staticAndInline ):
-                    return code +"template<int size0>\nvoid %s(const %s* __restrict__ A, int lda1, const int lda, %s* __restrict__ B, const int ldb1, const int ldb%s)\n{\n"%(transposeMicroKernelname, self.floatTypeA, self.floatTypeB,self.getBroadcastVariables(1))
+                    return transposeMicroKernelname, code +"template<int size0>\nvoid %s(const %s* __restrict__ A, int lda1, const int lda, %s* __restrict__ B, const int ldb1, const int ldb%s)\n{\n"%(transposeMicroKernelname, self.floatTypeA, self.floatTypeB,self.getBroadcastVariables(1))
                 else:
-                    return code +static+"void %s(const %s* __restrict__ A, int lda1, const int lda, %s* __restrict__ B, const int ldb1, const int ldb%s)\n{\n"%(transposeMicroKernelname, self.floatTypeA, self.floatTypeB,self.getBroadcastVariables(1))
+                    return transposeMicroKernelname, code +static+"void %s(const %s* __restrict__ A, int lda1, const int lda, %s* __restrict__ B, const int ldb1, const int ldb%s)\n{\n"%(transposeMicroKernelname, self.floatTypeA, self.floatTypeB,self.getBroadcastVariables(1))
 
 
     def getUpdateAndStore(self):
@@ -1253,6 +1269,8 @@ class transposeGenerator:
 
     def generateTranspositionKernel(self, blockings, prefetchDistances, staticAndInline=0, optimizations = []):
         # This function generates the transpose.cpp file (_not_ the transpose%d.cpp files)
+        #
+        # staticAndInline this is _only_ set if the final/fastest version will be dumped to file
 
         loadKernelA = self.getLoadKernel("A","lda", self.floatTypeA, 0, 0, 1)
 
@@ -1262,8 +1280,13 @@ class transposeGenerator:
         #generate DxD micro kernel
         for opt in optimizations:
             if( self.perm[0] != 0 ):
-                code = self.getMicroKernelHeader(self.microBlocking[0], opt, 0, staticAndInline)   
-                retHPP += code.split("\n")[1]+";\n"
+                transposeMicroKernelname, tmpCode = self.getMicroKernelHeader(self.microBlocking[0], 0, staticAndInline)   
+                code = ""
+                if( staticAndInline ):
+                    code += "#ifndef _TTC_%s\n"%transposeMicroKernelname.upper()
+                    code += "#define _TTC_%s\n"%transposeMicroKernelname.upper()
+                code += tmpCode
+                retHPP += tmpCode.split("\n")[1]+";\n"
                 if( self.scalar != 0 ):
                     code += "  for(int i=0; i < %d; i++)\n"%self.microBlocking[0][0]
                     code += "     for(int j=0; j < %d; j++)\n"%self.microBlocking[0][1]
@@ -1276,6 +1299,8 @@ class transposeGenerator:
                     code += self.microBlocking[1]
                     code += self.getUpdateAndStore()
                 code += "}\n"
+                if( staticAndInline ):
+                    code += "#endif\n"
                 ret += code
 
                 blockA = self.microBlocking[0][0]
@@ -1299,8 +1324,13 @@ class transposeGenerator:
                                 (blocking[0] / blockA > 1 or blocking[1] / blockB > 1 or
                                     prefetchDistance > 0)):
 
-                            code = self.getMicroKernelHeader(blocking, opt, prefetchDistance, staticAndInline)
-                            retHPP += code.split("\n")[1]+";\n"
+                            transposeMicroKernelname, tmpCode = self.getMicroKernelHeader(blocking, prefetchDistance, staticAndInline)
+                            code = ""
+                            if( staticAndInline ):
+                                code += "#ifndef _TTC_%s\n"%transposeMicroKernelname.upper()
+                                code += "#define _TTC_%s\n"%transposeMicroKernelname.upper()
+                            code += tmpCode
+                            retHPP += tmpCode.split("\n")[1]+";\n"
                             #replicate the micro-transpose to build the bigger transpose
                             numBlocksA = blocking[0] / blockA
                             numBlocksB = blocking[1] / blockB
@@ -1336,18 +1366,22 @@ class transposeGenerator:
                                         #clustered together"
                                         code += self.getPrefetchCode(i,j,numBlocksA,
                                                 numBlocksB, prefetchDistance, opt)
-                                    transposeName = "transpose%dx%d"%(blockA, blockB)
+                                    transposeName = "%sTranspose%dx%d"%(ttc_util.getFloatPrefix(self.floatTypeA, self.floatTypeB),blockA, blockB)
+                                    if( self.perm[0] == 0):
+                                        transposeName += "_0"
+                                    if( self.beta == 0 ):
+                                        transposeName += "_bz"
 
-                                    if( staticAndInline ):
-                                        transposeName += "_"
-                                        for p in self.perm:
-                                            transposeName += str(p)
+                                    #if( staticAndInline ):
+                                    #    transposeName += "_"
+                                    #    for p in self.perm:
+                                    #        transposeName += str(p)
                                   
-                                        transposeName +="_"
-                                        for idx in range(len(self.size)):
-                                             transposeName += "%d"%(self.size[idx])
-                                             if(idx != len(self.size)-1):
-                                                 transposeName +="x"
+                                    #    transposeName +="_"
+                                    #    for idx in range(len(self.size)):
+                                    #         transposeName += "%d"%(self.size[idx])
+                                    #         if(idx != len(self.size)-1):
+                                    #             transposeName +="x"
 
                                     code += self.indent + "//invoke micro-transpose\n"
                                     if( opt == "streamingstore"):
@@ -1360,7 +1394,6 @@ class transposeGenerator:
                                 code += self.indent + "// write buffer to main-memory via non-temporal stores\n"
                                 code += self.indent + "for( int i = 0; i < %d; i++){\n"%(blocking[0])
                                 if((blocking[1] * self.floatSizeB) % self.cacheLineSize != 0 ):
-                                    print blocking[1], self.floatSizeB,self.cacheLineSize
                                     print "ERROR (internal): blockB is not a multiple of the cacheline size"
                                     exit(-1)
                                 for j in range((blocking[1] / elementsPerRegister) ): #store one cacheline at a time
@@ -1384,11 +1417,24 @@ class transposeGenerator:
 
 
                             code += "}\n"
+                            if( staticAndInline ):
+                                code += "#endif\n"
                             ret += code
             else: # perm[0] == 0
-                for blocking in blockings:
-                    code = self.getMicroKernelHeader(blocking, opt, 0, staticAndInline)
-                    retHPP += code.split("\n")[1]+";\n"
+                tmpBlockings = copy.deepcopy(sorted(blockings)) #it's important to sort the
+                                                #blockings in an ascending order because all blockings will
+                                                #use the 1x1 as a building block. This is done to trick the
+                                                #compiler into issuing vmovntps, when needed
+                if( not (tmpBlockings[0][0] == 1 and tmpBlockings[0][1] == 1) ): # (1,1) needs to be present for every blocking
+                    tmpBlockings =  [(1,1)] + tmpBlockings
+                for blocking in tmpBlockings:
+                    transposeMicroKernelname, tmpCode = self.getMicroKernelHeader(blocking, 0, staticAndInline)
+                    code = ""
+                    if( staticAndInline ):
+                        code += "#ifndef _TTC_%s\n"%transposeMicroKernelname.upper()
+                        code += "#define _TTC_%s\n"%transposeMicroKernelname.upper()
+                    code += tmpCode
+                    retHPP += tmpCode.split("\n")[1]+";\n"
                     indent = self.indent
                     alphaFloatType = "float"
                     if( self.floatTypeA.find("double") != -1 ):
@@ -1396,30 +1442,52 @@ class transposeGenerator:
                     betaFloatType = "float"
                     if( self.floatTypeB.find("double") != -1 ):
                         alphaFloatType = "double"
-                    code += indent + "for(int ia = 0; ia < %d; ia++)\n"%(blocking[0])
-                    indent += self.indent
-                    code += indent + "for(int ib = 0; ib < %d; ib++)\n"%(blocking[1])
-                    indent += self.indent
-                    if self.architecture != "power":
-                        if( opt == "streamingstore" ):
-                            code += indent + "#pragma vector nontemporal\n"
-                        code += indent + "#pragma omp simd\n"
-                    if( staticAndInline ):
-                        code += indent + "for(int i0 = 0; i0 < size0; i0++)\n"
+                    offsetB = ""
+                    offsetA = ""
+                    if( blocking[0] > 1 ):
+                        code += indent + "for(int ia = 0; ia < %d; ia++)\n"%(blocking[0])
+                        offsetB += " + ia * ldb"
+                        offsetA += " + ia * lda1"
+                        indent += self.indent
+                    if( blocking[1] > 1 ):
+                        code += indent + "for(int ib = 0; ib < %d; ib++)\n"%(blocking[1])
+                        offsetB += " + ib * ldb1"
+                        offsetA += " + ib * lda"
+                        indent += self.indent
+
+
+                    if( (blocking[0] == 1 and blocking[1] == 1) or opt != "streamingstore"):
+                        if self.architecture != "power":
+                            if( opt == "streamingstore" ):
+                                code += indent + "#pragma vector nontemporal\n"
+                            code += indent + "#pragma omp simd\n"
+
+                        if( staticAndInline ):
+                            code += indent + "for(int i0 = 0; i0 < size0; i0++)\n"
+                        else:
+                            code += indent + "for(int i0 = 0; i0 < %d; i0++)\n"%(self.size[0])
+                        updateStr = ""
+                        outStr = "B[i0%s]"%offsetB
+                        if( len(self.size) == 1):
+                            inStr = "A[i0]"
+                        else:
+                            inStr = "A[i0%s]"%offsetA
+                        if( self.beta == 0.0 ):
+                            updateStr +=  "%s%s = alpha * %s;\n"%(indent + self.indent, outStr, inStr)
+                        else:
+                            updateStr +=  "%s%s = alpha * %s + beta * %s;\n"%(indent + self.indent, outStr, inStr, outStr)
+                        code += updateStr
                     else:
-                        code += indent + "for(int i0 = 0; i0 < %d; i0++)\n"%(self.size[0])
-                    updateStr = ""
-                    outStr = "B[i0 + ib * ldb1 + ia * ldb]"
-                    if( len(self.size) == 1):
-                        inStr = "A[i0]"
-                    else:
-                        inStr = "A[i0 + ia * lda1 + ib * lda]"
-                    if( self.beta == 0.0 ):
-                        updateStr +=  "%s%s = alpha * %s;\n"%(indent + self.indent, outStr, inStr)
-                    else:
-                        updateStr +=  "%s%s = alpha * %s + beta * %s;\n"%(indent + self.indent, outStr, inStr, outStr)
-                    code += updateStr
+                        betaStr = ""
+                        if( self.beta == 0 ):
+                            betaStr = "_bz"
+                        if( staticAndInline ):
+                            code += indent + "%sTranspose1x1_0%s<size0>(A%s, lda1, lda, B%s, ldb1, ldb, alpha);\n"%(ttc_util.getFloatPrefix(self.floatTypeA, self.floatTypeB),betaStr, offsetA, offsetB)
+                        else:
+                            code += indent + "%sTranspose1x1_0%s(A%s, lda1, lda, B%s, ldb1, ldb, alpha);\n"%(ttc_util.getFloatPrefix(self.floatTypeA, self.floatTypeB), betaStr, offsetA, offsetB)
                     code += "}\n"
+                    if( staticAndInline ):
+                        code += "#endif\n"
                     ret += code
 
 

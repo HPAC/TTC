@@ -24,7 +24,7 @@ import sys
 import os
 import subprocess
 import shutil 
-from ttc import transposeGenerator
+import ttc
 from ttc import ttc_util
 
 
@@ -37,9 +37,9 @@ def test_main():
     WARNING = '\033[93m'
     ENDC = '\033[0m'
 
-    print "Usage: python ./%s [-v : Verbose output, -q : quick, --compiler=[intel,gcc]]\n"%sys.argv[0]
+    print "Usage: python ./%s [-v : Verbose output, -q : quick, --compiler=[g++,icpc]]\n"%sys.argv[0]
 
-    _compiler = "intel"
+    _compiler = "icpc"
     _allowedArguments = ["-v","-q"]
     _quick = 0
     _numThreads = 10
@@ -78,30 +78,20 @@ def test_main():
     DEVNULL = open(os.devnull, 'wb')
 
     floatTypes = ["d","s","c","z","sd","ds","cz","zc" ]
-    alphaValues = [ 1, -1, 1.1]
+    alphaValues = [1.1]
     betaValues = [ 1, -1, 1.2, 0]
     permutations = [[2,0,1],[1,0],[0,2,1],[1,2,0],[1,0,2],[2,1,0],[3,1,0,2]] 
     sizes = [
                 [[11,8,3],[16,4,25]],
-                [[7,7],[7,8],[8,7],[8,8],[16,11],[11,16],[17,17],[17,23]],
+                [[7,3],[7,8],[8,7],[8,8],[16,11],[11,16],[17,17],[17,23]],
                 [[11,8,3],[1,4,3],[11,7,17],[11,17,7],[7,32,32]],
                 [[11,8,3],[4,4,3],[12,8,17],[33,17,7],[32,32,4]],
                 [[11,8,3],[16,16,3],[12,8,17],[33,17,7],[32,32,4]],
                 [[11,8,3],[16,4,25],[12,8,17],[33,17,9],[32,32,4]],
                 [[17,3,7,9]]
             ]
-    _loopOrder=[]
-    _blockings=[]
-    _mpi = 0
-
     def runTest(perm, size, alpha, beta, numImplementations, floatType, parallelize,
-            prefetchDistances, architecture):
-        lda =[1] 
-        for i in range(1,len(size)):
-            lda.append(lda[-1] * size[i-1])
-        ldb = [1]
-        for i in range(1,len(size)):
-            ldb.append(ldb[i-1]*size[perm[i-1]])
+            prefetchDistances, architecture, streamingStores = 0):
         permStr = ""
         for p in perm:
             permStr += str(p)+","
@@ -109,9 +99,6 @@ def test_main():
         for s in size:
             sizeStr += str(s)+","
         
-        version = "--alpha=%f --beta=%f --perm=%s --size=%s --dataType=%s"%(alpha,beta,permStr[:-1],sizeStr[:-1], floatType)
-        print "Current version:", version
- 
         floatParamA = "float"
         if floatType[0] == "d":
             floatParamA = "double"
@@ -132,52 +119,44 @@ def test_main():
             floatParamB = floatParamA
 
         ###########################################
-        # generate versions
+        # setup arguments
         ###########################################
-        generator = transposeGenerator(perm, _loopOrder, size, alpha, beta, numImplementations,
-                floatParamA, floatParamB, parallelize, 0, prefetchDistances,_blockings, _papi, _noTest,
-                _scalar, _align, architecture, _mpi, lda, ldb, 0)
-        generator.generate()
+        ttc_args = ttc_util.TTCargs(perm, size)
+        ttc_args.alpha = alpha
+        ttc_args.beta = beta
+        ttc_args.affinity = ""
+        ttc_args.numThreads = _numThreads
+        ttc_args.floatTypeA = floatParamA
+        ttc_args.floatTypeB = floatParamB
+        ttc_args.streamingStores = streamingStores
+        ttc_args.maxNumImplementations = numImplementations
+        ttc_args.ignoreDatabase = 1
+        ttc_args.lda = []
+        ttc_args.ldb = []
+        ttc_args.debug = 0
+        ttc_args.architecture = architecture
+        ttc_args.align = 1
+        ttc_args.blockings = []
+        ttc_args.loopPermutations = []
+        ttc_args.prefetchDistances  = []
+        ttc_args.scalar = 0
+        ttc_args.silent = 1
+        ttc_args.hotA = 0
+        ttc_args.hotB = 0 
+ 
 
         ###########################################
-        # compile versions
+        # run test
         ###########################################
-        print "[make] Compile ...                                 "
-        if debug == 0:
-            ret = subprocess.call(["make", "-j", _compiler], stdout=DEVNULL, stderr=subprocess.STDOUT)
-        else:
-            ret = subprocess.call(["make", "-j", _compiler])
-        if ret != 0 :
-            print FAIL+"[Error] compilation of version ", version, " failed." + ENDC
-            failed.append(version)
-            return 1;
+        try:
+            (transposeName, bandwidth) = ttc.ttc.generateTransposition( ttc_args )
+        except:
+          print FAIL + "[Error] Test failed: ", ENDC
+          print ttc_args.getCommandLineString()
+          return 1
 
-        ###########################################
-        # run versions
-        ###########################################
-        #set environment variables
-        os.environ["OMP_NUM_THREADS"] = str(_numThreads)
-        os.environ["KMP_AFFINITY"] = "granularity=fine,compact,1,0"
 
-        print "[running] checking correctness"
-        proc = subprocess.Popen(['./transpose.exe'],stdout=subprocess.PIPE)
-
-        error = 0
-        while True:
-            line = proc.stdout.readline()
-            line = line.lower()
-            if( line.find("error") != -1 ):
-                error = 1;
-                break;
-            if( line.find("maximal bandwidth") != -1 ): #use this as termination criterion
-                break;
-        if error != 0:
-            print proc.poll()
-            print FAIL+"[Error] runtime error while executing ", version, ENDC
-            failed.append(version)
-            return 1;
-
-        print OKGREEN + "[Success] ",version, ENDC
+        print OKGREEN + "[Success] ",ttc_args.getCommandLineString(), ENDC
         return 0
             
 
@@ -200,25 +179,26 @@ def test_main():
                     perm = permutations[c]
                     for size in sizes[c]:
                         count += 1
-                        numImplementations = 200
+                        numImplementations = 40
                         failCount += runTest(perm, size, alpha, beta, numImplementations,
                                 floatType, parallelize, prefetchDistances, architecture )
 
                         if( _quick ):
                             break
 
-    alpha = 1.0
+    alpha = 1.1
     beta = 0.0
 #test all permutations and sizs
-    for c in range(len(sizes)):
-        for floatType in floatTypes:
-            perm = permutations[c]
-            for size in sizes[c]:
-                count += 1
-                numImplementations = 200
-                failCount += runTest(perm, size, alpha, beta, numImplementations, floatType, parallelize, prefetchDistances, architecture )
-                if( _quick ):
-                    break
+    for streamingStores in [0,1]:
+        for c in range(len(sizes)):
+            for floatType in floatTypes:
+                perm = permutations[c]
+                for size in sizes[c]:
+                    count += 1
+                    numImplementations = 40
+                    failCount += runTest(perm, size, alpha, beta, numImplementations, floatType, parallelize, prefetchDistances, architecture, streamingStores  )
+                    if( _quick ):
+                        break
 
 
     alpha = 1.0
@@ -231,7 +211,7 @@ def test_main():
             perm = permutations[c]
             for size in sizes[c]:
                 count += 1
-                numImplementations = 200
+                numImplementations = 40
                 failCount += runTest(perm, size, alpha, beta, numImplementations, floatType, parallelize, distances, architecture )
                 if( _quick ):
                     break

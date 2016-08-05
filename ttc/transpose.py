@@ -79,9 +79,12 @@ class implementation:
                     self.ldout = i
                     break;
 
-        self.transposeMacroKernelname = "transpose%dx%d"%(self.blockA,self.blockB)
-        if( self.optimization != "" ):
-            self.transposeMacroKernelname += "_"+ self.optimization
+        
+        self.transposeMacroKernelname = "%sTranspose%dx%d"%(ttc_util.getFloatPrefix(self.floatTypeA, self.floatTypeB), self.blockA,self.blockB)
+        if( self.perm[0] == 0):
+            self.transposeMacroKernelname += "_0"
+        if( self.beta == 0 ):
+            self.transposeMacroKernelname += "_bz"
 
         if( self.prefetchDistance > 0 ):
             self.transposeMacroKernelname += "_prefetch_"+ str(self.prefetchDistance)
@@ -158,6 +161,9 @@ class implementation:
             firstIdx = 0
             if( self.perm[0] == 0 ):
                 firstIdx = 1
+
+            if( self.optimization == "streamingstore" and len(loopPerm) == 1 and self.perm[0] != 0):
+                self.code += "#pragma vector nontemporal\n"
             if( remainderIdx == firstIdx and loopIdx == self.perm[firstIdx]):
                 self.code +=  "%sfor(int i%d = 0; i%d < size%d - remainder%d; i%d += %d)\n"%(indent,loopIdx,loopIdx,loopIdx,loopIdx,loopIdx,increment)
             else:
@@ -216,18 +222,18 @@ class implementation:
             self.__printLoopBody(loopPerm[1:], indent + "   ", clean)
         else: #we reached the innermost loop, no recursion
 
-            if( clean ):
-                cleanMacroTransposeName = self.transposeMacroKernelname + "_"
-                for i in self.perm:
-                    cleanMacroTransposeName += str(i)
+            #if( clean ):
+            #    cleanMacroTransposeName = self.transposeMacroKernelname + "_"
+            #    for i in self.perm:
+            #        cleanMacroTransposeName += str(i)
           
-                cleanMacroTransposeName +="_"
-                for idx in range(len(self.size)):
-                     cleanMacroTransposeName += "%d"%(self.size[idx])
-                     if(idx != len(self.size)-1):
-                         cleanMacroTransposeName +="x"
-            else:
-                cleanMacroTransposeName = self.transposeMacroKernelname
+            #    cleanMacroTransposeName +="_"
+            #    for idx in range(len(self.size)):
+            #         cleanMacroTransposeName += "%d"%(self.size[idx])
+            #         if(idx != len(self.size)-1):
+            #             cleanMacroTransposeName +="x"
+            #else:
+            cleanMacroTransposeName = self.transposeMacroKernelname
 
             if( self.prefetchDistance > 0):
                 indexStr = ""
@@ -291,8 +297,6 @@ class implementation:
                 versionName += str(0) #0 is always the innermost loop in this case
 
             versionName += "_%dx%d"%(self.blockA, self.blockB)
-            if( self.optimization != "" ):
-                versionName += "_"+self.optimization
             if( self.prefetchDistance > 0 ):
                 versionName += "_prefetch_" + str(self.prefetchDistance)
 
@@ -518,16 +522,16 @@ class implementation:
                 if( endPos != -1):
                     endPos -= 1 #remove last '_'
                 cleanMacroTransposeName = self.transposeMacroKernelname[:endPos]#remove prefetch
-                if( clean ):
-                    cleanMacroTransposeName += "_"
-                    for i in self.perm:
-                        cleanMacroTransposeName += str(i)
+                #if( clean ):
+                #    cleanMacroTransposeName += "_"
+                #    for i in self.perm:
+                #        cleanMacroTransposeName += str(i)
               
-                    cleanMacroTransposeName +="_"
-                    for idx in range(len(self.size)):
-                         cleanMacroTransposeName += "%d"%(self.size[idx])
-                         if(idx != len(self.size)-1):
-                             cleanMacroTransposeName +="x"
+                #    cleanMacroTransposeName +="_"
+                #    for idx in range(len(self.size)):
+                #         cleanMacroTransposeName += "%d"%(self.size[idx])
+                #         if(idx != len(self.size)-1):
+                #             cleanMacroTransposeName +="x"
                 self.code += indent + "    %s(&A[task.offsetA], lda%d, &B[task.offsetB], ldb%d %s);\n"%(cleanMacroTransposeName, self.perm[0], self.ldout, self.getBroadcastVariables())
                 self.code += indent + "    tasks.pop();\n"
                 self.code += indent + "}\n"
@@ -536,24 +540,24 @@ class implementation:
             if( parallel ):
                 indent += self.indent
             if( self.perm[0] != 0 ):
-                if( parallel ):
-                    self.code += "#pragma omp for collapse(%d) schedule(static)\n"%(self.dim)
                 self.code += indent + "//Remainder loop" + "\n"
+                if( parallel ):
+                    self.code += "#pragma omp for collapse(%d) schedule(static)\n"%(self.dim-1)
                 self.printRemainderLoop(self.loopPerm, indent, 0)
 
-                if( parallel ):
-                    self.code += "#pragma omp for collapse(%d) schedule(static)\n"%(self.dim)
                 self.code += indent + "//Remainder loop" + "\n"
+                if( parallel ):
+                    self.code += "#pragma omp for collapse(%d) schedule(static)\n"%(self.dim-1)
                 self.printRemainderLoop(self.loopPerm, indent, self.perm[0])
             else:
+                self.code += indent + "//Remainder loop" + "\n"
                 if( parallel ):
                     self.code += "#pragma omp for collapse(%d) schedule(static)\n"%(self.dim-1)
-                self.code += indent + "//Remainder loop" + "\n"
                 self.printRemainderLoop(self.loopPerm, indent, 1)
 
+                self.code += indent + "//Remainder loop" + "\n"
                 if( parallel ):
                     self.code += "#pragma omp for collapse(%d) schedule(static)\n"%(self.dim-1)
-                self.code += indent + "//Remainder loop" + "\n"
                 self.printRemainderLoop(self.loopPerm, indent, self.perm[1])
 
             if( parallel ):
