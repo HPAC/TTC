@@ -135,7 +135,7 @@ def printHelp():
     print "   --compiler=[g++,icpc,ibm,nvcc]".ljust(60),"choose compiler (default: icpc)"
     print "   --numThreads=<value>".ljust(60),"number of threads to launch"
     print """   --affinity=<text>".ljust(60),"thread affinity (WARNING: this
-    value should to be specified by the user explicityly because it can effect
+    value should to be specified by the user explicitly because it can effect
     performance severely and the optimal choice depends on the
     enumeration/numbering of the cores on your system)
     The thread affinity respectively sets the value for the 'KMP_AFFINITY' or the 'GOMP_CPU_AFFINITY' environment variable for icpc or g++ compiler.
@@ -157,7 +157,7 @@ def printHelp():
     print "   --keep".ljust(60),"Keep the generated C++ files in ${TTC_ROOT}/tmp..."
     print "   --ignoreDatabase".ljust(60),"Don't use the SQL database (i.e., no lookup)."
     print "   --no-align".ljust(60),"prevents use of aligned load/store instructions (use this if your arrays are not aligned)."
-    print "   --loopPerm=<index1>,<index2>,...,<indexN>[-<next permutation>]".ljust(60),"generates only the specifed loop order"
+    print "   --loopPerm=<index1>,<index2>,...,<indexN>[-<next permutation>]".ljust(60),"generates only the specified loop order"
     print "   --hotA".ljust(60),"Specifying this flag will keep the input tensor A in cache while measuring (this will not have any effect if A does not fit into the cache)."
     print "   --hotB".ljust(60),"Specifying this flag will keep the input tensor B in cache while measuring (this will not have any effect if B does not fit into the cache)."
     print "   --help".ljust(60),"prints this help"
@@ -1115,8 +1115,9 @@ def generateTransposition( ttcArgs ):
             connection.commit()
             connection.close()
 
+    # remove/delete temporary directory
     os.chdir("..")
-    if( not ttcArgs.keep):
+    if( not ttcArgs.keep ):
         shutil.rmtree(tmpDirectory)
 
     os.chdir(workingDir)
