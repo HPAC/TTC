@@ -777,7 +777,7 @@ def generateTransposition( ttcArgs ):
         else:
             print "thread affinity: ".ljust(20)+"KMP_AFFINITY=%s"%ttcArgs.affinity
         print "Compiler: ".ljust(20) + ttc_util.getCompilerVersion(ttcArgs.compiler)
-        print "Tempory directory:".ljust(20) + "${TTC_ROOT}/ttc/"+tmpDirectory
+        print "Temporary directory:".ljust(20) + "${TTC_ROOT}/ttc/"+tmpDirectory
         version = ttc_util.getVersion()
         print "Beta:".ljust(20) + "%f"%(ttcArgs.beta)
         print "Version:".ljust(20) + "v%d.%d.%d"%(version[0],version[1],version[2])
@@ -819,7 +819,7 @@ def generateTransposition( ttcArgs ):
                     if( ttcArgs.idxPerm[0] == 0 ): #the first index will always be within our kernel (i.e., it will always be the inner-most loop)
                         ret.remove(0)
                     if( ret != -1 ): #we have found a solution
-                        if( blockA == 1 and blockB == 1):
+                        if( blockA == 1 and blockB == 1 and ttcArgs.architecture != "cuda"):
                             emitReference = 1
                         ttcArgs.blockings = [(blockA, blockB)]
                         solutionFound = 1

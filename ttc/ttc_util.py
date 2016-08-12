@@ -292,6 +292,7 @@ def getCompilerVersion(compiler):
         proc = subprocess.Popen([comp, version],stdout=subprocess.PIPE)
         proc.wait()
     except OSError:
+        print FAIL + "[TTC] ERROR: compiler (%s) does not seem to be available."%compiler + ENDC
         return -1
 
     output = proc.communicate()[0].split("\n")
