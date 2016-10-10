@@ -961,6 +961,8 @@ def generateTransposition( ttcArgs ):
                 if proc.returncode != 0:
                     print proc.poll()
                     print FAIL+"[Error] runtime error.", ENDC
+                    print FAIL+"Suggestion: Make sure that your system supports AVX instructions.", ENDC
+                    print FAIL+"Suggestion: You can execute the generate binary yourself and furthe investiage the source of the error. The generated files (including the compiled binary) can be found at: ",tmpDirectory, ENDC
                     exit(-1)
 
                 if failCount == 0:
