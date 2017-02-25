@@ -277,9 +277,9 @@ class cuda_transpose:
                code +="      Btmp = Bref %s;\n\n"%(offsetB)
                #code +="  // if(blockIdx.x < %d )\n"%(self.getNumBlocks())
                if(self.isBeta):
-                   code +="      cuSharedMemTranspose_vec%d(Atmp,Btmp,alpha,beta,lda_kernel,ldb_kernel,tile);\n"%(self.vectorLength)
+                   code +="      cuSharedMemTranspose_%dx%d_vec%d(Atmp,Btmp,alpha,beta,lda_kernel,ldb_kernel,tile);\n"%(self.tiling[0],self.tiling[1],self.vectorLength)
                else: 
-                   code +="      cuSharedMemTranspose_vec%d(Atmp,Btmp,alpha,lda_kernel,ldb_kernel,tile);\n"%(self.vectorLength)
+                   code +="      cuSharedMemTranspose_%dx%d_vec%d(Atmp,Btmp,alpha,lda_kernel,ldb_kernel,tile);\n"%(self.tiling[0],self.tiling[1],self.vectorLength)
 
         return code
 
@@ -288,12 +288,12 @@ class cuda_transpose:
 
     def getSharedTransposeKernel(self):
 	code = ""
-        code +="__device__\n"
+        code +="static __device__\n"
 
         if(self.isBeta):
-            code +="void cuSharedMemTranspose_vec%d(const %s *Atmp, %s *Btmp, const %s alpha, const %s beta, int lda, int ldb, %s tile[32][33])\n"%(self.vectorLength, self.floatTypeA, self.floatTypeB,self.alphaFloatType, self.betaFloatType, self.floatTypeA)
+            code +="void cuSharedMemTranspose_%dx%d_vec%d(const %s *Atmp, %s *Btmp, const %s alpha, const %s beta, int lda, int ldb, %s tile[32][33])\n"%(self.tiling[0],self.tiling[1],self.vectorLength, self.floatTypeA, self.floatTypeB,self.alphaFloatType, self.betaFloatType, self.floatTypeA)
         else:    
-            code +="void cuSharedMemTranspose_vec%d(const %s *Atmp, %s *Btmp, const %s alpha, int lda, int ldb, %s tile[32][33])\n"%(self.vectorLength, self.floatTypeA, self.floatTypeB, self.alphaFloatType, self.floatTypeA)
+            code +="void cuSharedMemTranspose_%dx%d_vec%d(const %s *Atmp, %s *Btmp, const %s alpha, int lda, int ldb, %s tile[32][33])\n"%(self.tiling[0],self.tiling[1],self.vectorLength, self.floatTypeA, self.floatTypeB, self.alphaFloatType, self.floatTypeA)
         code +="{\n\n" 
         code +="   const int TILE_DIM_X = %d;\n"%(self.tiling[0])
         code +="   const int TILE_DIM_Y = %d;\n"%(self.tiling[1])
@@ -325,7 +325,7 @@ class cuda_transpose:
 
     def getRemainderTransposeKernel(self, blocking):
 	code = ""
-        code +="__device__\n"
+        code +="static __device__\n"
 
         if(self.isBeta):
             code +="void %s(const %s *Atmp, %s *Btmp, const %s alpha, const %s beta, int lda, int ldb, int remainderx, int remaindery, %s tile[32][33])\n"%(self.getRemainderKernelHeader(), self.floatTypeA, self.floatTypeB,self.alphaFloatType, self.betaFloatType, self.floatTypeA)

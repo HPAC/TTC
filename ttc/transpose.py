@@ -83,11 +83,14 @@ class implementation:
         self.transposeMacroKernelname = "%sTranspose%dx%d"%(ttc_util.getFloatPrefix(self.floatTypeA, self.floatTypeB), self.blockA,self.blockB)
         if( self.perm[0] == 0):
             self.transposeMacroKernelname += "_0"
+        if( self.optimization != "" ):
+            self.transposeMacroKernelname += "_%s"%self.optimization
         if( self.beta == 0 ):
             self.transposeMacroKernelname += "_bz"
 
         if( self.prefetchDistance > 0 ):
             self.transposeMacroKernelname += "_prefetch_"+ str(self.prefetchDistance)
+
 
     def getPrefetchDistance(self):
         return self.prefetchDistance 
@@ -300,7 +303,6 @@ class implementation:
             if( self.prefetchDistance > 0 ):
                 versionName += "_prefetch_" + str(self.prefetchDistance)
 
-
         return versionName
 
     def getTransposeName(self, clean = 0):
@@ -354,6 +356,9 @@ class implementation:
 
         if(self.parallelize == 1):
             transposeName += "_par"
+
+        if( self.optimization != "" ):
+            transposeName += "_%s"%self.optimization
 
         if(self.beta == 0):
             transposeName += "_bz"

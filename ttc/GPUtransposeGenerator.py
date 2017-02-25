@@ -730,7 +730,6 @@ class GPUtransposeGenerator:
             ##code = "#include <complex.h>\n\n"
             if(self.perm[0] != 0):
                 cudaCode += cudaTranspose.getSharedTransposeKernel()
-                #if(self.remainderA != 0 or self.remainderB != 0):
 	        cudaCode += cudaTranspose.getRemainderTransposeKernel(32)
 	    for b in self.blockings:
 	        for l in self.loopPermutations:

@@ -298,3 +298,17 @@ def getCompilerVersion(compiler):
     output = proc.communicate()[0].split("\n")
     return output[0]
 
+def streamingStoresApplicable(ldb, size, perm, beta, alignmentRequirementBytes, floatSizeBytes, useStreamingStores):
+    leadingDimension = size[perm[0]]
+    if(len(ldb) > 0 ):
+        leadingDimension = ldb[0]
+
+    if( useStreamingStores == 1 and beta == 0 ):
+        if( perm[0] == 0 ):
+            return 1
+        else:
+            if( (leadingDimension * floatSizeBytes) % alignmentRequirementBytes == 0 ): #there exists one blocking which is a multiple of the cacheline size
+                return 1
+            else:
+                return 0
+    return 0

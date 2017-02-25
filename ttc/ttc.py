@@ -86,6 +86,9 @@ def getTransposeName( ttcArgs ):
     if( compiler != "nvcc" and numThreads > 1):
         name += "_par"
 
+    if( compiler != "nvcc" and ttc_util.streamingStoresApplicable(ttcArgs.ldb, size, perm, beta, 64, ttc_util.getFloatTypeSize(floatTypeB), ttcArgs.streamingStores ) ):
+        name += "_streamingstore"
+
     if(beta==0):
         name += "_bz"
 
@@ -127,8 +130,8 @@ def printHelp():
     print "   --size=<size1>,<size2>,...,<sizeN>".ljust(60),"size of the input tensor"
     print ""
     print "optional arguments:"
-    print "   --lda=<lda1>,<lda2>,...,<ldaN>".ljust(60),"leading dimension of each dimension of the input tensor"
-    print "   --ldb=<ldb1>,<ldb2>,...,<ldbN>".ljust(60),"leading dimension of each dimension of the output tensor"
+    print "   --lda=<lda1>,<lda2>,...,<ldaN>".ljust(60),"outer-size of each dimension of the input tensor"
+    print "   --ldb=<ldb1>,<ldb2>,...,<ldbN>".ljust(60),"outer-size of each dimension of the output tensor"
     print "   --maxImplementations=<value>".ljust(60),"limit the number of implementations"
     print "   ".ljust(14),"-> Default: 200; -1 denotes 'no limit'" 
     print "   --beta=<value>".ljust(60),"beta value (default: 0.0)"

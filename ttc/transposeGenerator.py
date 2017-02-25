@@ -173,7 +173,7 @@ class transposeGenerator:
         
         #generate scalar version as reference
         optRef = ""
-        if( self.streamingStoresApplicable() ):
+        if( ttc_util.streamingStoresApplicable(self.ldb, self.size, self.perm, self.beta, self.cacheLineSize, self.floatSizeB, self.streamingStores) ):
             optRef = "streamingstore"
         self.referenceImplementation = transpose.implementation((1,1),
                 perm[-1::-1], self.perm, self.size, self.alpha, self.beta,
@@ -275,30 +275,13 @@ class transposeGenerator:
         if( len(self.size) != 1 and ( not(self.perm[0] == 0 and self.perm[1] == 1)) ): #only use code generator if at least one of the first two indices changes
             self.genCandidates()
         self.printMain()
-        self.generateImplementations()
-            
-    def streamingStoresApplicable(self, blockingB = 0):
-        if( self.streamingStores == 1 and self.beta == 0 ):
-            if( self.perm[0] == 0 ):
-                return 1
-            else:
-                if( blockingB == 0 ):
-                    if( (self.size[self.perm[0]] * self.floatSizeB) % self.cacheLineSize == 0 ): #there exists one blocking which is a multiple of the cacheline size
-                        return 1
-                    else:
-                        return 0
-                else:
-                    if( (blockingB * self.floatSizeB) % self.cacheLineSize == 0 ):
-                        return 1
-                    else:
-                        return 0
-        return 0
+        self.generateImplementations() 
 
     def getAppropriateOptimizations(self):
         optimizations = []
 
         # streaming-stores
-        if( self.streamingStoresApplicable() ):
+        if( ttc_util.streamingStoresApplicable(self.ldb, self.size, self.perm, self.beta, self.cacheLineSize, self.floatSizeB, self.streamingStores) ):
             optimizations.append("streamingstore")
         else:
             optimizations.append("")
@@ -324,7 +307,7 @@ class transposeGenerator:
                     
                     for opt in optimizations:
                     
-                        if( opt == "streamingstore" and not self.streamingStoresApplicable(blocking[1]) ):
+                        if( opt == "streamingstore" and not ttc_util.streamingStoresApplicable(self.ldb, self.size, self.perm, self.beta, self.cacheLineSize, self.floatSizeB, self.streamingStores) ):
                             #skip this optimization if the blocking in B is not a multiple of the cacheLineSize
                             continue
 
@@ -1135,6 +1118,9 @@ class transposeGenerator:
         if( self.perm[0] == 0):
             transposeMicroKernelname += "_0"
 
+        if( ttc_util.streamingStoresApplicable(self.ldb, self.size, self.perm, self.beta, self.cacheLineSize, self.floatSizeB, self.streamingStores) ):
+            transposeMicroKernelname += "_streamingstore"
+
         if( self.beta == 0 ):
             transposeMicroKernelname += "_bz"
 
@@ -1317,7 +1303,7 @@ class transposeGenerator:
                 for prefetchDistance in prefetchDistances:
                     # generate arbitrary blockings based on the DxD micro kernel
                     for blocking in blockings:
-                        if( opt == "streamingstore" and (not self.streamingStoresApplicable(blocking[1])) ):
+                        if( opt == "streamingstore" and (not ttc_util.streamingStoresApplicable(self.ldb, self.size, self.perm, self.beta, self.cacheLineSize, self.floatSizeB, self.streamingStores)) ):
                             continue #skip this blocking if necessary
 
                         if ( blocking[0] % blockA == 0 and blocking[1] % blockB == 0 and
@@ -1369,19 +1355,10 @@ class transposeGenerator:
                                     transposeName = "%sTranspose%dx%d"%(ttc_util.getFloatPrefix(self.floatTypeA, self.floatTypeB),blockA, blockB)
                                     if( self.perm[0] == 0):
                                         transposeName += "_0"
+                                    if( ttc_util.streamingStoresApplicable(self.ldb, self.size, self.perm, self.beta, self.cacheLineSize, self.floatSizeB, self.streamingStores) ):
+                                        transposeName += "_streamingstore"
                                     if( self.beta == 0 ):
                                         transposeName += "_bz"
-
-                                    #if( staticAndInline ):
-                                    #    transposeName += "_"
-                                    #    for p in self.perm:
-                                    #        transposeName += str(p)
-                                  
-                                    #    transposeName +="_"
-                                    #    for idx in range(len(self.size)):
-                                    #         transposeName += "%d"%(self.size[idx])
-                                    #         if(idx != len(self.size)-1):
-                                    #             transposeName +="x"
 
                                     code += self.indent + "//invoke micro-transpose\n"
                                     if( opt == "streamingstore"):
@@ -1393,7 +1370,7 @@ class transposeGenerator:
                                 elementsPerRegister = self.registerSizeBits / 8 / self.floatSizeB
                                 code += self.indent + "// write buffer to main-memory via non-temporal stores\n"
                                 code += self.indent + "for( int i = 0; i < %d; i++){\n"%(blocking[0])
-                                if((blocking[1] * self.floatSizeB) % self.cacheLineSize != 0 ):
+                                if( not ttc_util.streamingStoresApplicable(self.ldb, self.size, self.perm, self.beta, self.cacheLineSize, self.floatSizeB, self.streamingStores) ):
                                     print "ERROR (internal): blockB is not a multiple of the cacheline size"
                                     exit(-1)
                                 for j in range((blocking[1] / elementsPerRegister) ): #store one cacheline at a time
@@ -1478,13 +1455,16 @@ class transposeGenerator:
                             updateStr +=  "%s%s = alpha * %s + beta * %s;\n"%(indent + self.indent, outStr, inStr, outStr)
                         code += updateStr
                     else:
+                        streamStr = ""
+                        if( opt == "streamingstore" ):
+                            streamStr = "_streamingstore"
                         betaStr = ""
                         if( self.beta == 0 ):
                             betaStr = "_bz"
                         if( staticAndInline ):
-                            code += indent + "%sTranspose1x1_0%s<size0>(A%s, lda1, lda, B%s, ldb1, ldb, alpha);\n"%(ttc_util.getFloatPrefix(self.floatTypeA, self.floatTypeB),betaStr, offsetA, offsetB)
+                            code += indent + "%sTranspose1x1_0%s%s<size0>(A%s, lda1, lda, B%s, ldb1, ldb, alpha);\n"%(ttc_util.getFloatPrefix(self.floatTypeA, self.floatTypeB),streamStr, betaStr, offsetA, offsetB)
                         else:
-                            code += indent + "%sTranspose1x1_0%s(A%s, lda1, lda, B%s, ldb1, ldb, alpha);\n"%(ttc_util.getFloatPrefix(self.floatTypeA, self.floatTypeB), betaStr, offsetA, offsetB)
+                            code += indent + "%sTranspose1x1_0%s%s(A%s, lda1, lda, B%s, ldb1, ldb, alpha);\n"%(ttc_util.getFloatPrefix(self.floatTypeA, self.floatTypeB), streamStr, betaStr, offsetA, offsetB)
                     code += "}\n"
                     if( staticAndInline ):
                         code += "#endif\n"
