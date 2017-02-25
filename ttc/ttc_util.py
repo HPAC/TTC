@@ -8,7 +8,7 @@ WARNING = '\033[93m'
 ENDC = '\033[0m'
 
 def getVersion():
-    return [0,1,1]
+    return [0,1,2]
 
 def createTmpDirectory():
     directory = "tmp"
