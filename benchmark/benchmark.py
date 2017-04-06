@@ -3,6 +3,7 @@ import math
 import os
 import sys
 import copy
+import eigen
 
 # This file generates multiple transpositions for benchmarking reasons.
 # The generated transpositions differ in: Size, dimensionality and order.
@@ -24,6 +25,7 @@ if len(sys.argv) < 3:
     print "Example: 'python benchmark.py 2 0,2 g++'"
     exit(0)
 
+_EigenRoot = "/home/ps072922/projects/eigen-3.3.3/"
 _affinity = sys.argv[2]
 _compiler = sys.argv[3]
 
@@ -62,7 +64,8 @@ _permutations = [
 
 _genString = "ttc --beta=%f --maxImplementations=500 --numThreads=%d --compiler=%s --architecture=avx --affinity=%s"%(_beta,_numThreads,_compiler,_affinity)
 
-def output(size, perm, fileHandle):
+
+def output(size, perm, fileHandle, fileHandleEigen, counter):
         sizeStr = ""
         for s in size:
             sizeStr += str(s)+","
@@ -74,9 +77,21 @@ def output(size, perm, fileHandle):
         fileHandle.write(_genString +" --size="+sizeStr + " --perm="+permStr+"\n")
         print permStr, "&", sizeStr
 
+        filename = "eigen%d.cpp"%counter
+        fileHandle = open(filename,"w")
+        code = eigen.genEigen(size, perm, _floatType, _floatTypeSize, _numThreads)
+        fileHandle.write(code)
+        fileHandle.close()
+        fileHandleEigen.write("icpc -O3 -I%s -std=c++14 -qopenmp -xHost %s\n"%(_EigenRoot,filename)) #O0 is used to avoid that the compiler removes trashCache()
+        fileHandleEigen.write("KMP_AFFINITY=compact,1 OMP_NUM_THREADS=%d numactl --interleave=all ./a.out >>eigen.dat\n"%_numThreads)
+        counter += 1
+
 
 fileHandle = open("benchmark.sh","w")
+fileHandleEigen = open("benchmarkEigen.sh","w")
+fileHandleEigen.write("rm -f eigen.dat\n")
 
+counter = 0
 for dim in range(2,7):
 
     numElements = _sizeMB/_floatTypeSize * 2.**20 #size in elements
@@ -117,7 +132,8 @@ for dim in range(2,7):
             sizeTmp[perm[0]] += (_leadingDimMultiple - sizeTmp[perm[0]]%_leadingDimMultiple)
 
         ### 1) everything pretty equal
-        output(sizeTmp, perm, fileHandle)
+        output(sizeTmp, perm, fileHandle, fileHandleEigen, counter)
+        counter+=1
 
         if dim >= 6:
             scewFactor = 3
@@ -142,7 +158,8 @@ for dim in range(2,7):
         if( sizeTmp[perm[0]] % _leadingDimMultiple != 0):
             sizeTmp[perm[0]] += (_leadingDimMultiple - sizeTmp[perm[0]]%_leadingDimMultiple)
 
-        output(sizeTmp, perm, fileHandle)
+        output(sizeTmp, perm, fileHandle, fileHandleEigen, counter)
+        counter+=1
 
         ### 3) skewed in perm[0]-dim
         sizeTmp = copy.deepcopy(size) #restore old size
@@ -170,9 +187,11 @@ for dim in range(2,7):
         if( sizeTmp[perm[0]] % _leadingDimMultiple != 0):
             sizeTmp[perm[0]] += (_leadingDimMultiple - sizeTmp[perm[0]]%_leadingDimMultiple)
 
-        output(sizeTmp, perm, fileHandle)
+        output(sizeTmp, perm, fileHandle, fileHandleEigen, counter)
+        counter+=1
 
 fileHandle.close()
+fileHandleEigen.close()
 
 
 

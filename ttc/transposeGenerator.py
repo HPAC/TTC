@@ -952,7 +952,7 @@ class transposeGenerator:
         for i in range(maxRange):
             if( self.aligned ):
                 if(self.architecture == "power"):
-                    code += self.indent + "%s row%s%d = vec_lda(0,const_cast<float*>(%s+%d+%d*%s));\n"%(vectorType,A,i,functionName,A,offset,i,lda)
+                    code += self.indent + "%s row%s%d = vec_lda(0,const_cast<float*>(%s+%d+%d*%s));\n"%(vectorType,A,i,A,offset,i,lda)
                 else:
                     code += self.indent + "%s row%s%d = %s(%s(%s + %d +%d*%s));\n"%(vectorType,A,i,functionName,cast,A,offset,i,lda)
             else:
