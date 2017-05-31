@@ -18,6 +18,8 @@ a C wrapper API for TTC.
 
 Current version: **v0.1.1**
 
+Please note that TTC is no longer updated since it has been replaced by an euivalent C++ library: [HPTT](https://github.com/springer13/hptt).
+
 # Key Features
 --------------
 
